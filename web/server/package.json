@@ -6,19 +6,25 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "chokidar": "^4.0.3",
     "express": "^5.1.0",
-"pngjs": "^7.0.0",
+    "pngjs": "^7.0.0",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.2",
     "@types/node": "^22.15.0",
     "@types/pngjs": "^6.0.5",
+    "eslint": "^10.0.2",
+    "globals": "^17.3.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1",
+    "vitest": "^4.0.18"
   }
 }

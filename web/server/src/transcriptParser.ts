@@ -267,7 +267,7 @@ function processProgressRecord(
 						parentToolId,
 						toolId,
 					});
-				}, 300);
+				}, TOOL_DONE_DELAY_MS);
 			}
 		}
 		let stillHasNonExempt = false;
