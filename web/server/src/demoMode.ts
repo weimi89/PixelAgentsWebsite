@@ -7,7 +7,7 @@ interface DemoTool {
 	isSubagent?: boolean;
 }
 
-// Demo tool sequences to simulate realistic agent behavior
+// 演示工具序列，用於模擬真實的代理行為
 const DEMO_TOOL_SEQUENCES: DemoTool[][] = [
 	[
 		{ name: 'Read', status: 'Reading index.ts', duration: 1500 },
@@ -60,13 +60,13 @@ function runToolSequence(agent: DemoAgent): void {
 	if (!sender) return;
 
 	const sequence = pickSequence();
-	let delay = randomInt(500, 2000); // initial pause before starting tools
+	let delay = randomInt(500, 2000); // 啟動工具前的初始暫停
 
 	for (let i = 0; i < sequence.length; i++) {
 		const tool = sequence[i];
 		const toolId = `demo-${agent.id}-${agent.currentSequence}-${i}`;
 
-		// Start tool
+		// 啟動工具
 		agent.timers.push(setTimeout(() => {
 			sender.postMessage({
 				type: 'agentToolStart',
@@ -80,7 +80,7 @@ function runToolSequence(agent: DemoAgent): void {
 				status: 'active',
 			});
 
-			// If it's a subtask, create sub-agent
+			// 如果是子任務，建立子代理
 			if (tool.isSubagent) {
 				sender.postMessage({
 					type: 'subagentToolStart',
@@ -89,7 +89,7 @@ function runToolSequence(agent: DemoAgent): void {
 					toolId: `${toolId}-sub-0`,
 					status: 'Reading README.md',
 				});
-				// Sub-agent tool done after a bit
+				// 稍後完成子代理工具
 				agent.timers.push(setTimeout(() => {
 					sender.postMessage({
 						type: 'subagentToolDone',
@@ -97,7 +97,7 @@ function runToolSequence(agent: DemoAgent): void {
 						parentToolId: toolId,
 						toolId: `${toolId}-sub-0`,
 					});
-					// Second sub-agent tool
+					// 第二個子代理工具
 					agent.timers.push(setTimeout(() => {
 						sender.postMessage({
 							type: 'subagentToolStart',
@@ -121,7 +121,7 @@ function runToolSequence(agent: DemoAgent): void {
 
 		delay += tool.duration;
 
-		// End tool
+		// 結束工具
 		agent.timers.push(setTimeout(() => {
 			sender.postMessage({
 				type: 'agentToolDone',
@@ -137,17 +137,17 @@ function runToolSequence(agent: DemoAgent): void {
 			}
 		}, delay));
 
-		delay += randomInt(300, 800); // gap between tools
+		delay += randomInt(300, 800); // 工具之間的間隔
 	}
 
-	// After all tools done → waiting state
+	// 所有工具完成後 → 等待狀態
 	agent.timers.push(setTimeout(() => {
 		sender.postMessage({
 			type: 'agentStatus',
 			id: agent.id,
 			status: 'waiting',
 		});
-		// After waiting period, start next sequence
+		// 等待期結束後，啟動下一個序列
 		const waitTime = randomInt(3000, 8000);
 		agent.timers.push(setTimeout(() => {
 			agent.currentSequence++;
@@ -160,7 +160,7 @@ export function startDemoMode(sender: MessageSender, agentCount: number = 3): vo
 	demoSender = sender;
 	console.log(`[Pixel Agents] Demo mode: spawning ${agentCount} agents`);
 
-	// Spawn agents with staggered timing
+	// 以交錯時間生成代理
 	for (let i = 0; i < agentCount; i++) {
 		spawnTimers.push(setTimeout(() => {
 			const id = nextDemoId++;
@@ -171,12 +171,12 @@ export function startDemoMode(sender: MessageSender, agentCount: number = 3): vo
 			};
 			demoAgents.push(agent);
 			sender.postMessage({ type: 'agentCreated', id });
-			// Simulate model assignment — alternate between models
+			// 模擬模型指派 — 在模型間交替
 			const demoModels = ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5-20251001'];
 			sender.postMessage({ type: 'agentModel', id, model: demoModels[(id - 1) % demoModels.length] });
 			console.log(`[Pixel Agents] Demo agent ${id} created`);
 
-			// Start activity after a short delay
+			// 短暫延遲後開始活動
 			agent.timers.push(setTimeout(() => {
 				runToolSequence(agent);
 			}, randomInt(1000, 3000)));

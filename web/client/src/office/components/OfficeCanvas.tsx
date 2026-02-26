@@ -32,21 +32,21 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const offsetRef = useRef({ x: 0, y: 0 })
-  // Ref for zoom so the game loop reads the latest value without restarting
+  // zoom 的 ref，使遊戲迴圈可讀取最新值而不需重啟
   const zoomRef = useRef(zoom)
   zoomRef.current = zoom
-  // Middle-mouse pan state (imperative, no re-renders)
+  // 中鍵平移狀態（命令式，不觸發重新渲染）
   const isPanningRef = useRef(false)
   const panStartRef = useRef({ mouseX: 0, mouseY: 0, panX: 0, panY: 0 })
-  // Delete/rotate button bounds (updated each frame by renderer)
+  // 刪除/旋轉按鈕邊界（由 renderer 每幀更新）
   const deleteButtonBoundsRef = useRef<DeleteButtonBounds | null>(null)
   const rotateButtonBoundsRef = useRef<RotateButtonBounds | null>(null)
-  // Right-click erase dragging
+  // 右鍵擦除拖曳
   const isEraseDraggingRef = useRef(false)
-  // Zoom scroll accumulator for trackpad pinch sensitivity
+  // 縮放滾動累加器，用於觸控板縮放靈敏度
   const zoomAccumulatorRef = useRef(0)
 
-  // Clamp pan so the map edge can't go past a margin inside the viewport
+  // 限制平移範圍，使地圖邊緣不會超出視窗內的邊距
   const clampPan = useCallback((px: number, py: number): { x: number; y: number } => {
     const canvas = canvasRef.current
     if (!canvas) return { x: px, y: py }
@@ -63,7 +63,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
     }
   }, [officeState, zoom])
 
-  // Resize canvas backing store to device pixels (no DPR transform on ctx)
+  // 調整 canvas 後端儲存區為裝置像素（不在 ctx 上做 DPR 變換）
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current
     const container = containerRef.current
@@ -74,7 +74,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
     canvas.height = Math.round(rect.height * dpr)
     canvas.style.width = `${rect.width}px`
     canvas.style.height = `${rect.height}px`
-    // No ctx.scale(dpr) — we render directly in device pixels
+    // 不使用 ctx.scale(dpr) — 我們直接以裝置像素渲染
   }, [])
 
   useEffect(() => {
@@ -93,11 +93,11 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
         officeState.update(dt)
       },
       render: (ctx) => {
-        // Canvas dimensions are in device pixels
+        // Canvas 尺寸為裝置像素
         const w = canvas.width
         const h = canvas.height
 
-        // Build editor render state
+        // 建構編輯器渲染狀態
         let editorRender: EditorRenderState | undefined
         if (isEditMode) {
           const showGhostBorder = editorState.activeTool === EditTool.TILE_PAINT || editorState.activeTool === EditTool.WALL_PAINT || editorState.activeTool === EditTool.ERASE
@@ -120,7 +120,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
             ghostBorderHoverRow: showGhostBorder ? editorState.ghostRow : -999,
           }
 
-          // Ghost preview for furniture placement
+          // 家具放置的幽靈預覽
           if (editorState.activeTool === EditTool.FURNITURE_PLACE && editorState.ghostCol >= 0) {
             const entry = getCatalogEntry(editorState.selectedFurnitureType)
             if (entry) {
@@ -136,7 +136,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
             }
           }
 
-          // Ghost preview for drag-to-move
+          // 拖曳移動的幽靈預覽
           if (editorState.isDragMoving && editorState.dragUid && editorState.ghostCol >= 0) {
             const draggedItem = officeState.getLayout().furniture.find((f) => f.uid === editorState.dragUid)
             if (draggedItem) {
@@ -158,7 +158,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
             }
           }
 
-          // Selection highlight
+          // 選取高亮
           if (editorState.selectedFurnitureUid && !editorState.isDragMoving) {
             const item = officeState.getLayout().furniture.find((f) => f.uid === editorState.selectedFurnitureUid)
             if (item) {
@@ -175,7 +175,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
           }
         }
 
-        // Camera follow: smoothly center on followed agent
+        // 鏡頭追蹤：平滑地將鏡頭置中於被追蹤的代理
         if (officeState.cameraFollowId !== null) {
           const followCh = officeState.characters.get(officeState.cameraFollowId)
           if (followCh) {
@@ -198,7 +198,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
           }
         }
 
-        // Build selection render state
+        // 建構選取渲染狀態
         const selectionRender: SelectionRenderState = {
           selectedAgentId: officeState.selectedAgentId,
           hoveredAgentId: officeState.hoveredAgentId,
@@ -225,7 +225,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
         )
         offsetRef.current = { x: offsetX, y: offsetY }
 
-        // Store delete/rotate button bounds for hit-testing
+        // 儲存刪除/旋轉按鈕邊界以供命中測試
         deleteButtonBoundsRef.current = editorRender?.deleteButtonBounds ?? null
         rotateButtonBoundsRef.current = editorRender?.rotateButtonBounds ?? null
       },
@@ -237,20 +237,20 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
     }
   }, [officeState, resizeCanvas, isEditMode, editorState, _editorTick, panRef])
 
-  // Convert CSS mouse coords to world (sprite pixel) coords
+  // 將 CSS 滑鼠座標轉換為世界（精靈像素）座標
   const screenToWorld = useCallback(
     (clientX: number, clientY: number) => {
       const canvas = canvasRef.current
       if (!canvas) return null
       const rect = canvas.getBoundingClientRect()
       const dpr = window.devicePixelRatio || 1
-      // CSS coords relative to canvas
+      // 相對於 canvas 的 CSS 座標
       const cssX = clientX - rect.left
       const cssY = clientY - rect.top
-      // Convert to device pixels
+      // 轉換為裝置像素
       const deviceX = cssX * dpr
       const deviceY = cssY * dpr
-      // Convert to world (sprite pixel) coords
+      // 轉換為世界（精靈像素）座標
       const worldX = (deviceX - offsetRef.current.x) / zoom
       const worldY = (deviceY - offsetRef.current.y) / zoom
       return { worldX, worldY, screenX: cssX, screenY: cssY, deviceX, deviceY }
@@ -265,7 +265,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
       const col = Math.floor(pos.worldX / TILE_SIZE)
       const row = Math.floor(pos.worldY / TILE_SIZE)
       const layout = officeState.getLayout()
-      // In edit mode with floor/wall/erase tool, extend valid range by 1 for ghost border
+      // 在編輯模式下使用地板/牆壁/擦除工具時，為幽靈邊框擴展有效範圍 1 格
       if (isEditMode && (editorState.activeTool === EditTool.TILE_PAINT || editorState.activeTool === EditTool.WALL_PAINT || editorState.activeTool === EditTool.ERASE)) {
         if (col < -1 || col > layout.cols || row < -1 || row > layout.rows) return null
         return { col, row }
@@ -276,16 +276,16 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
     [screenToWorld, officeState, isEditMode, editorState],
   )
 
-  // Check if device-pixel coords hit the delete button
+  // 檢查裝置像素座標是否命中刪除按鈕
   const hitTestDeleteButton = useCallback((deviceX: number, deviceY: number): boolean => {
     const bounds = deleteButtonBoundsRef.current
     if (!bounds) return false
     const dx = deviceX - bounds.cx
     const dy = deviceY - bounds.cy
-    return (dx * dx + dy * dy) <= (bounds.radius + 2) * (bounds.radius + 2) // small padding
+    return (dx * dx + dy * dy) <= (bounds.radius + 2) * (bounds.radius + 2) // 少量填充
   }, [])
 
-  // Check if device-pixel coords hit the rotate button
+  // 檢查裝置像素座標是否命中旋轉按鈕
   const hitTestRotateButton = useCallback((deviceX: number, deviceY: number): boolean => {
     const bounds = rotateButtonBoundsRef.current
     if (!bounds) return false
@@ -296,7 +296,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
-      // Handle middle-mouse panning
+      // 處理中鍵平移
       if (isPanningRef.current) {
         const dpr = window.devicePixelRatio || 1
         const dx = (e.clientX - panStartRef.current.mouseX) * dpr
@@ -314,18 +314,18 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
           editorState.ghostCol = tile.col
           editorState.ghostRow = tile.row
 
-          // Drag-to-move: check if cursor moved to different tile
+          // 拖曳移動：檢查游標是否移動到不同格
           if (editorState.dragUid && !editorState.isDragMoving) {
             if (tile.col !== editorState.dragStartCol || tile.row !== editorState.dragStartRow) {
               editorState.isDragMoving = true
             }
           }
 
-          // Paint on drag (tile/wall/erase paint tool only, not during furniture drag)
+          // 拖曳時繪製（僅限地板/牆壁/擦除繪製工具，非家具拖曳時）
           if (editorState.isDragging && (editorState.activeTool === EditTool.TILE_PAINT || editorState.activeTool === EditTool.WALL_PAINT || editorState.activeTool === EditTool.ERASE) && !editorState.dragUid) {
             onEditorTileAction(tile.col, tile.row)
           }
-          // Right-click erase drag
+          // 右鍵擦除拖曳
           if (isEraseDraggingRef.current && (editorState.activeTool === EditTool.TILE_PAINT || editorState.activeTool === EditTool.WALL_PAINT || editorState.activeTool === EditTool.ERASE)) {
             const layout = officeState.getLayout()
             if (tile.col >= 0 && tile.col < layout.cols && tile.row >= 0 && tile.row < layout.rows) {
@@ -337,7 +337,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
           editorState.ghostRow = -1
         }
 
-        // Cursor: show grab during drag, pointer over delete button, crosshair otherwise
+        // 游標：拖曳中顯示抓取、刪除按鈕上顯示指標、其他顯示十字
         const canvas = canvasRef.current
         if (canvas) {
           if (editorState.isDragMoving) {
@@ -347,7 +347,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
             if (pos && (hitTestDeleteButton(pos.deviceX, pos.deviceY) || hitTestRotateButton(pos.deviceX, pos.deviceY))) {
               canvas.style.cursor = 'pointer'
             } else if (editorState.activeTool === EditTool.FURNITURE_PICK && tile) {
-              // Pick mode: show pointer over furniture, crosshair elsewhere
+              // 吸管模式：家具上顯示指標，其他地方顯示十字
               const layout = officeState.getLayout()
               const hitFurniture = layout.furniture.find((f) => {
                 const entry = getCatalogEntry(f.type)
@@ -356,7 +356,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
               })
               canvas.style.cursor = hitFurniture ? 'pointer' : 'crosshair'
             } else if ((editorState.activeTool === EditTool.SELECT || (editorState.activeTool === EditTool.FURNITURE_PLACE && editorState.selectedFurnitureType === '')) && tile) {
-              // Check if hovering over furniture
+              // 檢查是否懸停在家具上
               const layout = officeState.getLayout()
               const hitFurniture = layout.furniture.find((f) => {
                 const entry = getCatalogEntry(f.type)
@@ -383,7 +383,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
         if (hitId !== null) {
           cursor = 'pointer'
         } else if (officeState.selectedAgentId !== null && tile) {
-          // Check if hovering over a clickable seat (available or own)
+          // 檢查是否懸停在可點擊的座位上（可用的或自己的）
           const seatId = officeState.getSeatAtTile(tile.col, tile.row)
           if (seatId) {
             const seat = officeState.seats.get(seatId)
@@ -405,10 +405,10 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       unlockAudio()
-      // Middle mouse button (button 1) starts panning
+      // 滑鼠中鍵（button 1）開始平移
       if (e.button === 1) {
         e.preventDefault()
-        // Break camera follow on manual pan
+        // 手動平移時中斷鏡頭追蹤
         officeState.cameraFollowId = null
         isPanningRef.current = true
         panStartRef.current = {
@@ -422,7 +422,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
         return
       }
 
-      // Right-click in edit mode for erasing
+      // 編輯模式下右鍵擦除
       if (e.button === 2 && isEditMode) {
         const tile = screenToTile(e.clientX, e.clientY)
         if (tile && (editorState.activeTool === EditTool.TILE_PAINT || editorState.activeTool === EditTool.WALL_PAINT || editorState.activeTool === EditTool.ERASE)) {
@@ -437,7 +437,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
 
       if (!isEditMode) return
 
-      // Check rotate/delete button hit first
+      // 優先檢查旋轉/刪除按鈕命中
       const pos = screenToWorld(e.clientX, e.clientY)
       if (pos && hitTestRotateButton(pos.deviceX, pos.deviceY)) {
         onRotateSelected()
@@ -450,12 +450,12 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
 
       const tile = screenToTile(e.clientX, e.clientY)
 
-      // SELECT tool (or furniture tool with nothing selected): check for furniture hit to start drag
+      // SELECT 工具（或未選取物件的家具工具）：檢查家具命中以開始拖曳
       const actAsSelect = editorState.activeTool === EditTool.SELECT ||
         (editorState.activeTool === EditTool.FURNITURE_PLACE && editorState.selectedFurnitureType === '')
       if (actAsSelect && tile) {
         const layout = officeState.getLayout()
-        // Find all furniture at clicked tile, prefer surface items (on top of desks)
+        // 找到點擊格上的所有家具，優先選取表面物件（在書桌上方的）
         let hitFurniture = null as typeof layout.furniture[0] | null
         for (const f of layout.furniture) {
           const entry = getCatalogEntry(f.type)
@@ -465,7 +465,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
           }
         }
         if (hitFurniture) {
-          // Start drag — record offset from furniture's top-left
+          // 開始拖曳 — 記錄相對於家具左上角的偏移
           editorState.startDrag(
             hitFurniture.uid,
             tile.col,
@@ -475,13 +475,13 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
           )
           return
         } else {
-          // Clicked empty space — deselect
+          // 點擊空白處 — 取消選取
           editorState.clearSelection()
           onEditorSelectionChange()
         }
       }
 
-      // Non-select tools: start paint drag
+      // 非選取工具：開始繪製拖曳
       editorState.isDragging = true
       if (tile) {
         onEditorTileAction(tile.col, tile.row)
@@ -503,10 +503,10 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
         return
       }
 
-      // Handle drag-to-move completion
+      // 處理拖曳移動完成
       if (editorState.dragUid) {
         if (editorState.isDragMoving) {
-          // Compute target position
+          // 計算目標位置
           const ghostCol = editorState.ghostCol - editorState.dragOffsetCol
           const ghostRow = editorState.ghostRow - editorState.dragOffsetRow
           const draggedItem = officeState.getLayout().furniture.find((f) => f.uid === editorState.dragUid)
@@ -524,7 +524,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
           }
           editorState.clearSelection()
         } else {
-          // Click (no movement) — toggle selection
+          // 點擊（無移動）— 切換選取
           if (editorState.selectedFurnitureUid === editorState.dragUid) {
             editorState.clearSelection()
           } else {
@@ -546,15 +546,15 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
-      if (isEditMode) return // handled by mouseDown/mouseUp
+      if (isEditMode) return // 由 mouseDown/mouseUp 處理
       const pos = screenToWorld(e.clientX, e.clientY)
       if (!pos) return
 
       const hitId = officeState.getCharacterAt(pos.worldX, pos.worldY)
       if (hitId !== null) {
-        // Dismiss any active bubble on click
+        // 點擊時關閉任何活動的氣泡
         officeState.dismissBubble(hitId)
-        // Toggle selection: click same agent deselects, different agent selects
+        // 切換選取：點擊同一代理取消選取，不同代理則選取
         if (officeState.selectedAgentId === hitId) {
           officeState.selectedAgentId = null
           officeState.cameraFollowId = null
@@ -562,14 +562,14 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
           officeState.selectedAgentId = hitId
           officeState.cameraFollowId = hitId
         }
-        onClick(hitId) // still focus terminal
+        onClick(hitId) // 仍然聚焦終端
         return
       }
 
-      // No agent hit — check seat click while agent is selected
+      // 未命中代理 — 在代理已選取時檢查座位點擊
       if (officeState.selectedAgentId !== null) {
         const selectedCh = officeState.characters.get(officeState.selectedAgentId)
-        // Skip seat reassignment for sub-agents
+        // 子代理跳過座位重新指定
         if (selectedCh && !selectedCh.isSubagent) {
           const tile = screenToTile(e.clientX, e.clientY)
           if (tile) {
@@ -578,17 +578,17 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
               const seat = officeState.seats.get(seatId)
               if (seat && selectedCh) {
                 if (selectedCh.seatId === seatId) {
-                  // Clicked own seat — send agent back to it
+                  // 點擊自己的座位 — 送代理回去
                   officeState.sendToSeat(officeState.selectedAgentId)
                   officeState.selectedAgentId = null
                   officeState.cameraFollowId = null
                   return
                 } else if (!seat.assigned) {
-                  // Clicked available seat — reassign
+                  // 點擊可用座位 — 重新指定
                   officeState.reassignSeat(officeState.selectedAgentId, seatId)
                   officeState.selectedAgentId = null
                   officeState.cameraFollowId = null
-                  // Persist seat assignments (exclude sub-agents)
+                  // 持久化座位指定（排除子代理）
                   const seats: Record<number, { palette: number; seatId: string | null }> = {}
                   for (const ch of officeState.characters.values()) {
                     if (ch.isSubagent) continue
@@ -601,7 +601,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
             }
           }
         }
-        // Clicked empty space — deselect
+        // 點擊空白處 — 取消選取
         officeState.selectedAgentId = null
         officeState.cameraFollowId = null
       }
@@ -624,7 +624,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     if (isEditMode) return
-    // Right-click to walk selected agent to tile
+    // 右鍵讓選取的代理走向該格
     if (officeState.selectedAgentId !== null) {
       const tile = screenToTile(e.clientX, e.clientY)
       if (tile) {
@@ -633,12 +633,12 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
     }
   }, [isEditMode, officeState, screenToTile])
 
-  // Wheel: Ctrl+wheel to zoom, plain wheel/trackpad to pan
+  // 滾輪：Ctrl+滾輪縮放，普通滾輪/觸控板平移
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       e.preventDefault()
       if (e.ctrlKey || e.metaKey) {
-        // Accumulate scroll delta, step zoom when threshold crossed
+        // 累加滾動差值，超過閾值時步進縮放
         zoomAccumulatorRef.current += e.deltaY
         if (Math.abs(zoomAccumulatorRef.current) >= ZOOM_SCROLL_THRESHOLD) {
           const delta = zoomAccumulatorRef.current < 0 ? 1 : -1
@@ -649,7 +649,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
           }
         }
       } else {
-        // Pan via trackpad two-finger scroll or mouse wheel
+        // 透過觸控板雙指滾動或滑鼠滾輪平移
         const dpr = window.devicePixelRatio || 1
         officeState.cameraFollowId = null
         panRef.current = clampPan(
@@ -661,7 +661,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
     [zoom, onZoomChange, officeState, panRef, clampPan],
   )
 
-  // Prevent default middle-click browser behavior (auto-scroll)
+  // 防止瀏覽器中鍵預設行為（自動捲動）
   const handleAuxClick = useCallback((e: React.MouseEvent) => {
     if (e.button === 1) e.preventDefault()
   }, [])

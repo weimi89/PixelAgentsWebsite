@@ -33,13 +33,13 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
   if (!isOpen) return null
 
   const handleExport = () => {
-    // In web version, request the current layout from local state and download as file
-    // For now, we fetch from the server via a roundabout: save triggers are already in place
-    // So we read the layout from OfficeState (already in memory) - but we don't have access here.
-    // Instead, trigger a download of the current layout via the server save path:
-    vscode.postMessage({ type: 'saveLayout', layout: null }) // ensure saved
-    // Download from ~/.pixel-agents/layout.json isn't possible from browser,
-    // so we'll just skip export for now in web version (layout is auto-saved)
+    // 在 Web 版中，從本地狀態請求當前佈局並下載為檔案
+    // 目前透過迂迴方式從伺服器取得：儲存觸發器已就位
+    // 因此我們從 OfficeState（已在記憶體中）讀取佈局 - 但此處無法存取。
+    // 改為透過伺服器儲存路徑觸發當前佈局的下載：
+    vscode.postMessage({ type: 'saveLayout', layout: null }) // 確保已儲存
+    // 無法從瀏覽器下載 ~/.pixel-agents/layout.json，
+    // 因此 Web 版暫時跳過匯出（佈局已自動儲存）
     onClose()
   }
 
@@ -64,14 +64,14 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
       }
     }
     reader.readAsText(file)
-    // Reset input so same file can be re-imported
+    // 重設輸入框以便重新匯入同一檔案
     e.target.value = ''
     onClose()
   }
 
   return (
     <>
-      {/* Hidden file input for import */}
+      {/* 隱藏的檔案輸入，用於匯入 */}
       <input
         ref={importInputRef}
         type="file"
@@ -79,7 +79,7 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
         style={{ display: 'none' }}
         onChange={handleFileSelected}
       />
-      {/* Dark backdrop — click to close */}
+      {/* 深色背景遮罩 — 點擊關閉 */}
       <div
         onClick={onClose}
         style={{
@@ -92,7 +92,7 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
           zIndex: 49,
         }}
       />
-      {/* Centered modal */}
+      {/* 置中彈出視窗 */}
       <div
         style={{
           position: 'fixed',
@@ -108,7 +108,7 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
           minWidth: 200,
         }}
       >
-        {/* Header with title and X button */}
+        {/* 標題列與關閉按鈕 */}
         <div
           style={{
             display: 'flex',
@@ -138,7 +138,7 @@ export function SettingsModal({ isOpen, onClose, isDebugMode, onToggleDebugMode 
             X
           </button>
         </div>
-        {/* Menu items */}
+        {/* 選單項目 */}
         <button
           onClick={handleExport}
           onMouseEnter={() => setHovered('export')}

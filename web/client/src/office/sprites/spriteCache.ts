@@ -2,24 +2,24 @@ import type { SpriteData } from '../types.js'
 
 const zoomCaches = new Map<number, WeakMap<SpriteData, HTMLCanvasElement>>()
 
-// ── Outline sprite generation ─────────────────────────────────
+// ── 輪廓精靈圖生成 ─────────────────────────────────
 
 const outlineCache = new WeakMap<SpriteData, SpriteData>()
 
-/** Generate a 1px white outline SpriteData (2px larger in each dimension) */
+/** 生成 1px 白色輪廓 SpriteData（每個維度大 2px） */
 export function getOutlineSprite(sprite: SpriteData): SpriteData {
   const cached = outlineCache.get(sprite)
   if (cached) return cached
 
   const rows = sprite.length
   const cols = sprite[0].length
-  // Expanded grid: +2 in each dimension for 1px border
+  // 擴展網格：每個維度 +2 以容納 1px 邊框
   const outline: string[][] = []
   for (let r = 0; r < rows + 2; r++) {
     outline.push(new Array<string>(cols + 2).fill(''))
   }
 
-  // For each opaque pixel, mark its 4 cardinal neighbors as white
+  // 對每個不透明像素，將其 4 個基本方向鄰居標記為白色
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (sprite[r][c] === '') continue
@@ -32,7 +32,7 @@ export function getOutlineSprite(sprite: SpriteData): SpriteData {
     }
   }
 
-  // Clear pixels that overlap with original opaque pixels
+  // 清除與原始不透明像素重疊的像素
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (sprite[r][c] !== '') {

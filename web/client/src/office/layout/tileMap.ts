@@ -1,6 +1,6 @@
 import { TileType } from '../types.js'
 
-/** Check if a tile is walkable (floor, carpet, or doorway, and not blocked by furniture) */
+/** 檢查磚塊是否可行走（地板、地毯或門道，且未被家具封鎖） */
 export function isWalkable(
   col: number,
   row: number,
@@ -16,7 +16,7 @@ export function isWalkable(
   return true
 }
 
-/** Get walkable tile positions (grid coords) for wandering */
+/** 取得可行走的磚塊位置（網格座標），用於漫遊 */
 export function getWalkableTiles(
   tileMap: TileType[][],
   blockedTiles: Set<string>,
@@ -34,10 +34,10 @@ export function getWalkableTiles(
   return tiles
 }
 
-/** BFS pathfinding on 4-connected grid (no diagonals). Returns path excluding start, including end.
+/** 在 4 連通網格上的 BFS 尋路（無對角線）。返回不含起點但含終點的路徑。
  *
- * Uses integer keys (row * cols + col) and typed arrays instead of string keys
- * and Map/Set for lower GC pressure. Pointer-based dequeue avoids Array.shift() O(n). */
+ * 使用整數鍵（row * cols + col）和型別陣列取代字串鍵
+ * 和 Map/Set 以降低 GC 壓力。基於指標的佇列避免 Array.shift() 的 O(n)。 */
 export function findPath(
   startCol: number,
   startRow: number,
@@ -58,12 +58,12 @@ export function findPath(
   const endKey = endRow * cols + endCol
   const size = rows * cols
 
-  // Flat typed arrays: single allocation, no per-node string/object overhead
+  // 平面型別陣列：單次分配，無逐節點字串/物件開銷
   const visited = new Uint8Array(size)
   const parent = new Int32Array(size).fill(-1)
   visited[startKey] = 1
 
-  // Ring buffer queue — BFS visits at most `size` nodes
+  // 環形緩衝佇列 — BFS 最多走訪 `size` 個節點
   const queue = new Int32Array(size)
   let head = 0
   let tail = 0
@@ -76,7 +76,7 @@ export function findPath(
     const currKey = queue[head++]
 
     if (currKey === endKey) {
-      // Reconstruct: push + reverse avoids unshift's O(path²)
+      // 重建路徑：push + reverse 避免 unshift 的 O(path²)
       const path: Array<{ col: number; row: number }> = []
       let k = endKey
       while (k !== startKey) {

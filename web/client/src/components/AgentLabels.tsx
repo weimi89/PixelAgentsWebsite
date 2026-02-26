@@ -4,7 +4,7 @@ import { TILE_SIZE, CharacterState } from '../office/types.js'
 import { t } from '../i18n.js'
 import { useRenderTick } from '../hooks/useRenderTick.js'
 
-/** Format raw model ID to short display name, e.g. "claude-opus-4-6" → "Opus" */
+/** 將原始 model ID 格式化為簡短的顯示名稱，例如 "claude-opus-4-6" → "Opus" */
 function formatModelName(model: string): string {
   const m = model.match(/^claude-(\w+)/)
   if (m) {
@@ -40,7 +40,7 @@ export function AgentLabels({
   if (!el) return null
   const rect = el.getBoundingClientRect()
   const dpr = window.devicePixelRatio || 1
-  // Compute device pixel offset (same math as renderFrame, including pan)
+  // 計算裝置像素偏移（與 renderFrame 相同的計算，包含平移）
   const canvasW = Math.round(rect.width * dpr)
   const canvasH = Math.round(rect.height * dpr)
   const layout = officeState.getLayout()
@@ -49,13 +49,13 @@ export function AgentLabels({
   const deviceOffsetX = Math.floor((canvasW - mapW) / 2) + Math.round(panRef.current.x)
   const deviceOffsetY = Math.floor((canvasH - mapH) / 2) + Math.round(panRef.current.y)
 
-  // Build sub-agent label lookup
+  // 建立子代理標籤查找表
   const subLabelMap = new Map<number, string>()
   for (const sub of subagentCharacters) {
     subLabelMap.set(sub.id, sub.label)
   }
 
-  // All character IDs to render labels for (regular agents + sub-agents)
+  // 所有需要渲染標籤的角色 ID（一般代理 + 子代理）
   const allIds = [...agents, ...subagentCharacters.map((s) => s.id)]
 
   return (
@@ -64,10 +64,10 @@ export function AgentLabels({
         const ch = officeState.characters.get(id)
         if (!ch) return null
 
-        // Character position: device pixels → CSS pixels (follow sitting offset)
+        // 角色位置：裝置像素 → CSS 像素（跟隨坐姿偏移）
         const sittingOffset = ch.state === CharacterState.TYPE ? 14 : 0
-        // Hide label when a non-detached speech bubble is showing (let the bubble be visible alone)
-        // Detached bubble is persistent — show the label alongside it
+        // 當非斷線的對話氣泡顯示時隱藏標籤（讓氣泡單獨可見）
+        // 斷線氣泡是持久的 — 同時顯示標籤
         if (ch.bubbleType && ch.bubbleType !== 'detached') return null
 
         const screenX = (deviceOffsetX + ch.x * zoom) / dpr

@@ -15,18 +15,18 @@ export function isTmuxAvailable(): boolean {
 	return tmuxAvailable;
 }
 
-/** Build a tmux session name from a session UUID */
+/** 從會話 UUID 建構 tmux 會話名稱 */
 export function tmuxSessionName(sessionUuid: string): string {
 	return `${TMUX_SESSION_PREFIX}-${sessionUuid}`;
 }
 
-/** Parse a session UUID from a tmux session name, or null */
+/** 從 tmux 會話名稱解析會話 UUID，無法解析則返回 null */
 export function parseSessionUuid(name: string): string | null {
 	if (!name.startsWith(`${TMUX_SESSION_PREFIX}-`)) return null;
 	return name.slice(TMUX_SESSION_PREFIX.length + 1);
 }
 
-/** Create a detached tmux session running the given command */
+/** 建立一個在背景執行指定命令的 tmux 會話 */
 export function createTmuxSession(
 	sessionName: string,
 	bin: string,
@@ -34,7 +34,7 @@ export function createTmuxSession(
 	cwd: string,
 	env: Record<string, string | undefined>,
 ): void {
-	// Build the shell command to run inside tmux
+	// 建構要在 tmux 中執行的 shell 命令
 	const shellCmd = [bin, ...args].map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ');
 	const tmux = spawn('tmux', [
 		'new-session', '-d',
@@ -53,7 +53,7 @@ export function createTmuxSession(
 	tmux.unref();
 }
 
-/** Kill a tmux session by name */
+/** 依名稱終止 tmux 會話 */
 export function killTmuxSession(sessionName: string): void {
 	try {
 		execSync(`tmux kill-session -t ${JSON.stringify(sessionName)}`, {
@@ -61,11 +61,11 @@ export function killTmuxSession(sessionName: string): void {
 			stdio: 'pipe',
 		});
 	} catch {
-		// Session may already be dead
+		// 會話可能已經結束
 	}
 }
 
-/** Check if a tmux session is still alive */
+/** 檢查 tmux 會話是否仍然存活 */
 export function isTmuxSessionAlive(sessionName: string): boolean {
 	try {
 		execSync(`tmux has-session -t ${JSON.stringify(sessionName)}`, {
@@ -78,7 +78,7 @@ export function isTmuxSessionAlive(sessionName: string): boolean {
 	}
 }
 
-/** List all pixel-agents tmux sessions that are currently alive */
+/** 列出所有目前存活的 pixel-agents tmux 會話 */
 export function listPixelAgentSessions(): string[] {
 	try {
 		const output = execSync('tmux list-sessions -F "#{session_name}"', {

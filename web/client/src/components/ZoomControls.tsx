@@ -39,24 +39,24 @@ export function ZoomControls({ zoom, onZoomChange }: ZoomControlsProps) {
   const minDisabled = zoom <= ZOOM_MIN
   const maxDisabled = zoom >= ZOOM_MAX
 
-  // Show zoom level briefly when zoom changes
+  // 縮放變更時短暫顯示縮放等級
   useEffect(() => {
     if (zoom === prevZoomRef.current) return
     prevZoomRef.current = zoom
 
-    // Clear existing timers
+    // 清除現有計時器
     if (timerRef.current) clearTimeout(timerRef.current)
     if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current)
 
     setShowLevel(true)
     setFadeOut(false)
 
-    // Start fade after delay
+    // 延遲後開始淡出
     fadeTimerRef.current = setTimeout(() => {
       setFadeOut(true)
     }, ZOOM_LEVEL_FADE_DELAY_MS)
 
-    // Hide completely after delay
+    // 延遲後完全隱藏
     timerRef.current = setTimeout(() => {
       setShowLevel(false)
       setFadeOut(false)
@@ -70,7 +70,7 @@ export function ZoomControls({ zoom, onZoomChange }: ZoomControlsProps) {
 
   return (
     <>
-      {/* Zoom level indicator at top-center */}
+      {/* 縮放等級指示器，置於頂部中央 */}
       {showLevel && (
         <div
           style={{
@@ -96,7 +96,7 @@ export function ZoomControls({ zoom, onZoomChange }: ZoomControlsProps) {
         </div>
       )}
 
-      {/* Vertically stacked round buttons — top-left */}
+      {/* 垂直排列的圓形按鈕 — 左上角 */}
       <div
         style={{
           position: 'absolute',

@@ -16,10 +16,10 @@ export function useEditorKeyboard(
   useEffect(() => {
     if (!isEditMode) return
     const handler = (e: KeyboardEvent) => {
-      // Skip when focus is on input elements (e.g. settings modal)
+      // 當焦點在輸入元素上時跳過（例如設定面板）
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return
       if (e.key === 'Escape') {
-        // Multi-stage Esc: deselect item → close tool → deselect placed → close editor
+        // 多階段 Esc：取消選取物件 → 關閉工具 → 取消選取已放置物件 → 關閉編輯器
         if (editorState.activeTool === EditTool.FURNITURE_PICK) {
           editorState.activeTool = EditTool.FURNITURE_PLACE
           editorState.clearGhost()

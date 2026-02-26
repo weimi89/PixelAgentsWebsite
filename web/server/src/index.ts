@@ -30,7 +30,7 @@ import {
 } from './constants.js';
 import { isDemoEnabled, startDemoMode, stopDemoMode } from './demoMode.js';
 
-// ── State ────────────────────────────────────────────────────
+// ── 狀態 ────────────────────────────────────────────────────
 
 const agents = new Map<number, AgentState>();
 const nextAgentIdRef = { current: 1 };
@@ -39,21 +39,21 @@ const knownJsonlFiles = new Set<string>();
 const projectScanTimerRef = { current: null as ReturnType<typeof setInterval> | null };
 const tmuxRecoveredRef = { current: false };
 
-// Per-agent timers
+// 每個代理的計時器
 const fileWatchers = new Map<number, fs.FSWatcher>();
 const pollingTimers = new Map<number, ReturnType<typeof setInterval>>();
 const waitingTimers = new Map<number, ReturnType<typeof setTimeout>>();
 const jsonlPollTimers = new Map<number, ReturnType<typeof setInterval>>();
 const permissionTimers = new Map<number, ReturnType<typeof setTimeout>>();
 
-// Loaded assets (cached at startup)
+// 已載入的素材（啟動時快取）
 let cachedCharSprites: LoadedCharacterSprites | null = null;
 let cachedFloorTiles: LoadedFloorTiles | null = null;
 let cachedWallTiles: LoadedWallTiles | null = null;
 let cachedFurnitureAssets: LoadedAssets | null = null;
 let defaultLayout: Record<string, unknown> | null = null;
 
-// ── Persistence helpers ──────────────────────────────────────
+// ── 持久化輔助函式 ──────────────────────────────────────
 
 const userDir = path.join(os.homedir(), LAYOUT_FILE_DIR);
 
@@ -90,7 +90,7 @@ function persistAgents(): void {
 	savePersistedAgents(agents);
 }
 
-// ── tmux health check ───────────────────────────────────────
+// ── tmux 健康檢查 ───────────────────────────────────────
 
 let tmuxHealthTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -104,7 +104,7 @@ function startTmuxHealthCheck(sender: MessageSender): void {
 	}, TMUX_HEALTH_CHECK_INTERVAL_MS);
 }
 
-// ── Determine working directory ──────────────────────────────
+// ── 決定工作目錄 ──────────────────────────────────────────
 
 function findGitRoot(startDir: string): string | null {
 	let dir = startDir;
@@ -119,34 +119,34 @@ function findGitRoot(startDir: string): string | null {
 const cwd = process.argv[2] || findGitRoot(process.cwd()) || process.cwd();
 console.log(`[Pixel Agents] Working directory: ${cwd}`);
 
-// ── Resolve assets root ──────────────────────────────────────
+// ── 解析素材根目錄 ──────────────────────────────────────
 
 function findAssetsRoot(): string {
-	// Check 1: web/client/public/ (dev mode)
+	// 檢查 1：web/client/public/（開發模式）
 	const clientPublic = path.join(__dirname, '..', '..', 'client', 'public');
 	if (fs.existsSync(path.join(clientPublic, 'assets'))) {
 		return clientPublic;
 	}
-	// Check 2: web/client/dist/ (production build)
+	// 檢查 2：web/client/dist/（正式建置）
 	const clientDist = path.join(__dirname, '..', '..', 'client', 'dist');
 	if (fs.existsSync(path.join(clientDist, 'assets'))) {
 		return clientDist;
 	}
-	// Check 3: project root's webview-ui/public/
+	// 檢查 3：專案根目錄的 webview-ui/public/
 	const webviewPublic = path.join(__dirname, '..', '..', '..', 'webview-ui', 'public');
 	if (fs.existsSync(path.join(webviewPublic, 'assets'))) {
 		return webviewPublic;
 	}
-	// Fallback: current directory
+	// 備選：當前目錄
 	return cwd;
 }
 
-// ── Main ─────────────────────────────────────────────────────
+// ── 主程式 ─────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
 	const port = parseInt(process.env['PORT'] || String(DEFAULT_PORT), 10);
 
-	// Load assets
+	// 載入素材
 	const assetsRoot = findAssetsRoot();
 	console.log(`[Pixel Agents] Assets root: ${assetsRoot}`);
 
@@ -156,21 +156,21 @@ async function main(): Promise<void> {
 	cachedWallTiles = await loadWallTiles(assetsRoot);
 	cachedFurnitureAssets = await loadFurnitureAssets(assetsRoot);
 
-	// Setup Express + Socket.IO
+	// 設定 Express + Socket.IO
 	const app = express();
 	const httpServer = createServer(app);
 	const io = new Server(httpServer, {
 		cors: { origin: '*' },
-		maxHttpBufferSize: 10 * 1024 * 1024, // 10MB for large asset payloads
+		maxHttpBufferSize: 10 * 1024 * 1024, // 10MB，用於大型素材傳輸
 	});
 
-	// Serve client static files (production)
+	// 提供客戶端靜態檔案（正式環境）
 	const clientDistPath = path.join(__dirname, '..', '..', 'client', 'dist');
 	if (fs.existsSync(clientDistPath)) {
 		app.use(express.static(clientDistPath));
 	}
 
-	// Socket.IO connection handler
+	// Socket.IO 連線處理器
 	io.on('connection', (socket) => {
 		console.log(`[Pixel Agents] Client connected: ${socket.id}`);
 
@@ -201,7 +201,7 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 	console.log(`[Pixel Agents] Received message: ${msg.type}`);
 	switch (msg.type) {
 		case 'webviewReady': {
-			// Send assets in sequence
+			// 依序傳送素材
 			if (cachedCharSprites) {
 				sender.postMessage({
 					type: 'characterSpritesLoaded',
@@ -232,26 +232,26 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 				});
 			}
 
-			// Send layout
+			// 傳送佈局
 			const layout = loadLayout(defaultLayout);
 			sender.postMessage({ type: 'layoutLoaded', layout });
 
-			// Send settings
+			// 傳送設定
 			const settings = readJsonFile<{ soundEnabled?: boolean }>(getSettingsPath(), {});
 			sender.postMessage({ type: 'settingsLoaded', soundEnabled: settings.soundEnabled ?? true });
 
-			// Send existing agents
+			// 傳送現有代理
 			const agentMeta = readJsonFile<Record<string, { palette?: number; hueShift?: number; seatId?: string }>>(
 				getAgentSeatsPath(), {},
 			);
 			sendExistingAgents(agents, agentMeta, sender);
 
-			// Demo mode or real auto-detection
+			// 演示模式或真實的自動偵測
 			if (isDemoEnabled()) {
 				const demoCount = parseInt(process.env['DEMO_AGENTS'] || '3', 10);
 				startDemoMode(sender, demoCount);
 			} else {
-				// Recover tmux agents from previous server run BEFORE project scan (once only)
+				// 在專案掃描之前，從上一次伺服器執行中恢復 tmux 代理（僅一次）
 				if (!tmuxRecoveredRef.current) {
 					tmuxRecoveredRef.current = true;
 					recoverTmuxAgents(
@@ -260,10 +260,10 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 						sender, persistAgents,
 					);
 				}
-				// Re-send existing agents after recovery (includes recovered tmux agents)
+				// 恢復後重新傳送現有代理（包含已恢復的 tmux 代理）
 				sendExistingAgents(agents, agentMeta, sender);
 
-				// Start project scan — auto-detect running Claude sessions across ALL projects
+				// 啟動專案掃描 — 自動偵測所有專案中正在執行的 Claude 會話
 				const projectDirs = getAllProjectDirs();
 				ensureProjectScan(
 					projectDirs, knownJsonlFiles, projectScanTimerRef,
@@ -272,7 +272,7 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 					jsonlPollTimers, sender, persistAgents,
 				);
 
-				// Start tmux health check
+				// 啟動 tmux 健康檢查
 				startTmuxHealthCheck(sender);
 			}
 			break;
@@ -297,7 +297,7 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 			break;
 		}
 		case 'focusAgent': {
-			// Web version: just visual selection, no terminal to focus
+			// Web 版本：僅視覺選取，沒有終端可聚焦
 			break;
 		}
 		case 'saveAgentSeats': {
@@ -330,7 +330,7 @@ function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender
 			);
 			break;
 		}
-		// exportLayout / importLayout are handled client-side in web version
+		// exportLayout / importLayout 在 Web 版本中由客戶端處理
 	}
 }
 

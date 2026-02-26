@@ -19,7 +19,7 @@ import { SessionPicker } from './components/SessionPicker.js'
 import type { SessionInfo } from './components/SessionPicker.js'
 import { t } from './i18n.js'
 
-// Game state lives outside React — updated imperatively by message handlers
+// 遊戲狀態存在於 React 之外 — 由訊息處理器以命令式方式更新
 const officeStateRef = { current: null as OfficeState | null }
 const editorState = new EditorState()
 
@@ -180,7 +180,7 @@ function App() {
   }, [])
 
   const handleClick = useCallback((agentId: number) => {
-    // If clicked agent is a sub-agent, focus the parent's terminal instead
+    // 若點擊的是子代理，改為聚焦父代理的終端
     const os = getOfficeState()
     const meta = os.subagentMeta.get(agentId)
     const focusId = meta ? meta.parentAgentId : agentId
@@ -189,10 +189,10 @@ function App() {
 
   const officeState = getOfficeState()
 
-  // Force dependency on editorTickForKeyboard to propagate keyboard-triggered re-renders
+  // 強制依賴 editorTickForKeyboard 以傳播鍵盤觸發的重新渲染
   void editorTickForKeyboard
 
-  // Show "Press R to rotate" hint when a rotatable item is selected or being placed
+  // 當選取或正在放置可旋轉的物件時顯示「按 R 旋轉」提示
   const showRotateHint = editor.isEditMode && (() => {
     if (editorState.selectedFurnitureUid) {
       const item = officeState.getLayout().furniture.find((f) => f.uid === editorState.selectedFurnitureUid)
@@ -241,7 +241,7 @@ function App() {
 
       <ZoomControls zoom={editor.zoom} onZoomChange={editor.handleZoomChange} />
 
-      {/* Vignette overlay */}
+      {/* 暈影覆蓋層 */}
       <div
         style={{
           position: 'absolute',
@@ -297,7 +297,7 @@ function App() {
       )}
 
       {editor.isEditMode && (() => {
-        // Compute selected furniture color from current layout
+        // 從當前佈局計算所選家具的顏色
         const selUid = editorState.selectedFurnitureUid
         const selColor = selUid
           ? officeState.getLayout().furniture.find((f) => f.uid === selUid)?.color ?? null

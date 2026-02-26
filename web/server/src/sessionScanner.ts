@@ -28,7 +28,7 @@ export function scanAllSessions(
 		dirs = fs.readdirSync(projectsRoot, { withFileTypes: true });
 	} catch { return sessions; }
 
-	// Build set of active JSONL files
+	// 建構活躍 JSONL 檔案的集合
 	const activeFiles = new Set<string>();
 	for (const agent of agents.values()) {
 		activeFiles.add(agent.jsonlFile);
@@ -61,7 +61,7 @@ export function scanAllSessions(
 		}
 	}
 
-	// Sort by modification time descending
+	// 按修改時間降序排列
 	sessions.sort((a, b) => b.modifiedAt - a.modifiedAt);
 
 	return sessions.slice(0, MAX_SESSIONS);
@@ -94,12 +94,12 @@ function extractSessionInfo(
 		try {
 			const record = JSON.parse(line);
 
-			// Extract project name from cwd
+			// 從 cwd 提取專案名稱
 			if (!projectName && record.cwd) {
 				projectName = path.basename(record.cwd);
 			}
 
-			// Find first real user text message (skip system, meta, tool_results)
+			// 找到第一則真實的使用者文字訊息（跳過系統、元資料、tool_results）
 			if (!title && record.type === 'user') {
 				const content = record.message?.content;
 				if (typeof content === 'string') {

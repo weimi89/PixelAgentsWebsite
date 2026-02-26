@@ -3,7 +3,7 @@ import type { TileType as TileTypeVal, OfficeLayout, PlacedFurniture, Seat, Furn
 import { getCatalogEntry } from './furnitureCatalog.js'
 import { getColorizedSprite } from '../colorize.js'
 
-/** Convert flat tile array from layout into 2D grid */
+/** 將佈局的平面磚塊陣列轉換為二維網格 */
 export function layoutToTileMap(layout: OfficeLayout): TileTypeVal[][] {
   const map: TileTypeVal[][] = []
   for (let r = 0; r < layout.rows; r++) {
@@ -16,9 +16,9 @@ export function layoutToTileMap(layout: OfficeLayout): TileTypeVal[][] {
   return map
 }
 
-/** Convert placed furniture into renderable FurnitureInstance[] */
+/** 將已放置的家具轉換為可渲染的 FurnitureInstance[] */
 export function layoutToFurnitureInstances(furniture: PlacedFurniture[]): FurnitureInstance[] {
-  // Pre-compute desk zY per tile so surface items can sort in front of desks
+  // 預先計算每格的書桌 zY，使表面項目可在書桌前方排序
   const deskZByTile = new Map<string, number>()
   for (const item of furniture) {
     const entry = getCatalogEntry(item.type)
@@ -42,20 +42,20 @@ export function layoutToFurnitureInstances(furniture: PlacedFurniture[]): Furnit
     const spriteH = entry.sprite.length
     let zY = y + spriteH
 
-    // Chair z-sorting: ensure characters sitting on chairs render correctly
+    // 椅子 Z 排序：確保坐在椅子上的角色正確渲染
     if (entry.category === 'chairs') {
       if (entry.orientation === 'back') {
-        // Back-facing chairs render IN FRONT of the seated character
-        // (the chair back visually occludes the character behind it)
+        // 背面椅子渲染在坐著的角色前方
+        //（椅背在視覺上遮擋後方的角色）
         zY = (item.row + 1) * TILE_SIZE + 1
       } else {
-        // All other chairs: cap zY to first row bottom so characters
-        // at any seat tile render in front of the chair
+        // 其他所有椅子：將 zY 限制在第一行底部，使任何座位格的
+        // 角色都渲染在椅子前方
         zY = (item.row + 1) * TILE_SIZE
       }
     }
 
-    // Surface items render in front of the desk they sit on
+    // 表面項目渲染在其所在書桌的前方
     if (entry.canPlaceOnSurfaces) {
       for (let dr = 0; dr < entry.footprintH; dr++) {
         for (let dc = 0; dc < entry.footprintW; dc++) {
@@ -65,7 +65,7 @@ export function layoutToFurnitureInstances(furniture: PlacedFurniture[]): Furnit
       }
     }
 
-    // Colorize sprite if this furniture has a color override
+    // 若此家具有色彩覆寫則著色精靈圖
     let sprite = entry.sprite
     if (item.color) {
       const { h, s, b: bv, c: cv } = item.color
@@ -77,8 +77,8 @@ export function layoutToFurnitureInstances(furniture: PlacedFurniture[]): Furnit
   return instances
 }
 
-/** Get all tiles blocked by furniture footprints, optionally excluding a set of tiles.
- *  Skips top backgroundTiles rows so characters can walk through them. */
+/** 取得所有被家具佔地封鎖的磚塊，可選擇排除一組磚塊。
+ *  跳過頂部 backgroundTiles 列，使角色可穿越。 */
 export function getBlockedTiles(furniture: PlacedFurniture[], excludeTiles?: Set<string>): Set<string> {
   const tiles = new Set<string>()
   for (const item of furniture) {
@@ -86,7 +86,7 @@ export function getBlockedTiles(furniture: PlacedFurniture[], excludeTiles?: Set
     if (!entry) continue
     const bgRows = entry.backgroundTiles || 0
     for (let dr = 0; dr < entry.footprintH; dr++) {
-      if (dr < bgRows) continue // skip background rows — characters can walk through
+      if (dr < bgRows) continue // 跳過背景列 — 角色可穿越
       for (let dc = 0; dc < entry.footprintW; dc++) {
         const key = `${item.col + dc},${item.row + dr}`
         if (excludeTiles && excludeTiles.has(key)) continue
@@ -97,7 +97,7 @@ export function getBlockedTiles(furniture: PlacedFurniture[], excludeTiles?: Set
   return tiles
 }
 
-/** Get tiles blocked for placement purposes — skips top backgroundTiles rows per item */
+/** 取得用於放置目的的封鎖磚塊 — 跳過每個項目的頂部 backgroundTiles 列 */
 export function getPlacementBlockedTiles(furniture: PlacedFurniture[], excludeUid?: string): Set<string> {
   const tiles = new Set<string>()
   for (const item of furniture) {
@@ -106,7 +106,7 @@ export function getPlacementBlockedTiles(furniture: PlacedFurniture[], excludeUi
     if (!entry) continue
     const bgRows = entry.backgroundTiles || 0
     for (let dr = 0; dr < entry.footprintH; dr++) {
-      if (dr < bgRows) continue // skip background rows
+      if (dr < bgRows) continue // 跳過背景列
       for (let dc = 0; dc < entry.footprintW; dc++) {
         tiles.add(`${item.col + dc},${item.row + dr}`)
       }
@@ -115,7 +115,7 @@ export function getPlacementBlockedTiles(furniture: PlacedFurniture[], excludeUi
   return tiles
 }
 
-/** Map chair orientation to character facing direction */
+/** 將椅子朝向映射為角色面對方向 */
 function orientationToFacing(orientation: string): Direction {
   switch (orientation) {
     case 'front': return Direction.DOWN
@@ -126,12 +126,12 @@ function orientationToFacing(orientation: string): Direction {
   }
 }
 
-/** Generate seats from chair furniture.
- *  Facing priority: 1) chair orientation, 2) adjacent desk, 3) forward (DOWN). */
+/** 從椅子家具產生座位。
+ *  面向優先順序：1) 椅子朝向，2) 相鄰書桌，3) 前方（DOWN）。 */
 export function layoutToSeats(furniture: PlacedFurniture[]): Map<string, Seat> {
   const seats = new Map<string, Seat>()
 
-  // Build set of all desk tiles
+  // 建構所有書桌磚塊的集合
   const deskTiles = new Set<string>()
   for (const item of furniture) {
     const entry = getCatalogEntry(item.type)
@@ -144,14 +144,14 @@ export function layoutToSeats(furniture: PlacedFurniture[]): Map<string, Seat> {
   }
 
   const dirs: Array<{ dc: number; dr: number; facing: Direction }> = [
-    { dc: 0, dr: -1, facing: Direction.UP },    // desk is above chair → face UP
-    { dc: 0, dr: 1, facing: Direction.DOWN },   // desk is below chair → face DOWN
-    { dc: -1, dr: 0, facing: Direction.LEFT },   // desk is left of chair → face LEFT
-    { dc: 1, dr: 0, facing: Direction.RIGHT },   // desk is right of chair → face RIGHT
+    { dc: 0, dr: -1, facing: Direction.UP },    // 書桌在椅子上方 → 面朝上
+    { dc: 0, dr: 1, facing: Direction.DOWN },   // 書桌在椅子下方 → 面朝下
+    { dc: -1, dr: 0, facing: Direction.LEFT },   // 書桌在椅子左方 → 面朝左
+    { dc: 1, dr: 0, facing: Direction.RIGHT },   // 書桌在椅子右方 → 面朝右
   ]
 
-  // For each chair, every footprint tile becomes a seat.
-  // Multi-tile chairs (e.g. 2-tile couches) produce multiple seats.
+  // 每張椅子的每個佔地磚塊都成為一個座位。
+  // 多格椅子（例如 2 格沙發）產生多個座位。
   for (const item of furniture) {
     const entry = getCatalogEntry(item.type)
     if (!entry || entry.category !== 'chairs') continue
@@ -162,10 +162,10 @@ export function layoutToSeats(furniture: PlacedFurniture[]): Map<string, Seat> {
         const tileCol = item.col + dc
         const tileRow = item.row + dr
 
-        // Determine facing direction:
-        // 1) Chair orientation takes priority
-        // 2) Adjacent desk direction
-        // 3) Default forward (DOWN)
+        // 決定面對方向：
+        // 1) 椅子朝向優先
+        // 2) 相鄰書桌方向
+        // 3) 預設前方（DOWN）
         let facingDir: Direction = Direction.DOWN
         if (entry.orientation) {
           facingDir = orientationToFacing(entry.orientation)
@@ -178,7 +178,7 @@ export function layoutToSeats(furniture: PlacedFurniture[]): Map<string, Seat> {
           }
         }
 
-        // First seat uses chair uid (backward compat), subsequent use uid:N
+        // 第一個座位使用椅子 uid（向後相容），後續使用 uid:N
         const seatUid = seatCount === 0 ? item.uid : `${item.uid}:${seatCount}`
         seats.set(seatUid, {
           uid: seatUid,
@@ -195,7 +195,7 @@ export function layoutToSeats(furniture: PlacedFurniture[]): Map<string, Seat> {
   return seats
 }
 
-/** Get the set of tiles occupied by seats (so they can be excluded from blocked tiles) */
+/** 取得座位佔據的磚塊集合（以便從封鎖磚塊中排除） */
 export function getSeatTiles(seats: Map<string, Seat>): Set<string> {
   const tiles = new Set<string>()
   for (const seat of seats.values()) {
@@ -204,13 +204,13 @@ export function getSeatTiles(seats: Map<string, Seat>): Set<string> {
   return tiles
 }
 
-/** Default floor colors for the two rooms */
-const DEFAULT_LEFT_ROOM_COLOR: FloorColor = { h: 35, s: 30, b: 15, c: 0 }  // warm beige
-const DEFAULT_RIGHT_ROOM_COLOR: FloorColor = { h: 25, s: 45, b: 5, c: 10 }  // warm brown
-const DEFAULT_CARPET_COLOR: FloorColor = { h: 280, s: 40, b: -5, c: 0 }     // purple
-const DEFAULT_DOORWAY_COLOR: FloorColor = { h: 35, s: 25, b: 10, c: 0 }     // tan
+/** 兩個房間的預設地板顏色 */
+const DEFAULT_LEFT_ROOM_COLOR: FloorColor = { h: 35, s: 30, b: 15, c: 0 }  // 暖米色
+const DEFAULT_RIGHT_ROOM_COLOR: FloorColor = { h: 25, s: 45, b: 5, c: 10 }  // 暖棕色
+const DEFAULT_CARPET_COLOR: FloorColor = { h: 280, s: 40, b: -5, c: 0 }     // 紫色
+const DEFAULT_DOORWAY_COLOR: FloorColor = { h: 35, s: 25, b: 10, c: 0 }     // 棕褐色
 
-/** Create the default office layout matching the current hardcoded office */
+/** 建立與當前硬編碼辦公室相符的預設辦公室佈局 */
 export function createDefaultLayout(): OfficeLayout {
   const W = TileType.WALL
   const F1 = TileType.FLOOR_1
@@ -252,12 +252,12 @@ export function createDefaultLayout(): OfficeLayout {
     { uid: 'cooler-1', type: FurnitureType.COOLER, col: 17, row: 7 },
     { uid: 'plant-right', type: FurnitureType.PLANT, col: 18, row: 1 },
     { uid: 'whiteboard-1', type: FurnitureType.WHITEBOARD, col: 15, row: 0 },
-    // Left desk chairs
+    // 左側書桌椅子
     { uid: 'chair-l-top', type: FurnitureType.CHAIR, col: 4, row: 2 },
     { uid: 'chair-l-bottom', type: FurnitureType.CHAIR, col: 5, row: 5 },
     { uid: 'chair-l-left', type: FurnitureType.CHAIR, col: 3, row: 4 },
     { uid: 'chair-l-right', type: FurnitureType.CHAIR, col: 6, row: 3 },
-    // Right desk chairs
+    // 右側書桌椅子
     { uid: 'chair-r-top', type: FurnitureType.CHAIR, col: 13, row: 2 },
     { uid: 'chair-r-bottom', type: FurnitureType.CHAIR, col: 14, row: 5 },
     { uid: 'chair-r-left', type: FurnitureType.CHAIR, col: 12, row: 4 },
@@ -267,61 +267,61 @@ export function createDefaultLayout(): OfficeLayout {
   return { version: 1, cols: DEFAULT_COLS, rows: DEFAULT_ROWS, tiles, tileColors, furniture }
 }
 
-/** Serialize layout to JSON string */
+/** 將佈局序列化為 JSON 字串 */
 export function serializeLayout(layout: OfficeLayout): string {
   return JSON.stringify(layout)
 }
 
-/** Deserialize layout from JSON string, migrating old tile types if needed */
+/** 從 JSON 字串反序列化佈局，必要時遷移舊的磚塊類型 */
 export function deserializeLayout(json: string): OfficeLayout | null {
   try {
     const obj = JSON.parse(json)
     if (obj && obj.version === 1 && Array.isArray(obj.tiles) && Array.isArray(obj.furniture)) {
       return migrateLayout(obj as OfficeLayout)
     }
-  } catch { /* ignore parse errors */ }
+  } catch { /* 忽略解析錯誤 */ }
   return null
 }
 
 /**
- * Ensure layout has tileColors. If missing, generate defaults based on tile types.
- * Exported for use by message handlers that receive layouts over the wire.
+ * 確保佈局具有 tileColors。若缺少，根據磚塊類型產生預設值。
+ * 匯出供接收遠端佈局的訊息處理器使用。
  */
 export function migrateLayoutColors(layout: OfficeLayout): OfficeLayout {
   return migrateLayout(layout)
 }
 
 /**
- * Migrate old layouts that use legacy tile types (TILE_FLOOR=1, WOOD_FLOOR=2, CARPET=3, DOORWAY=4)
- * to the new pattern-based system. If tileColors is already present, no migration needed.
+ * 遷移使用舊磚塊類型（TILE_FLOOR=1, WOOD_FLOOR=2, CARPET=3, DOORWAY=4）的舊佈局
+ * 至新的花紋系統。若 tileColors 已存在，無需遷移。
  */
 function migrateLayout(layout: OfficeLayout): OfficeLayout {
   if (layout.tileColors && layout.tileColors.length === layout.tiles.length) {
-    return layout // Already migrated
+    return layout // 已遷移
   }
 
-  // Check if any tiles use old values (1-4) — these map directly to FLOOR_1-4
-  // but need color assignments
+  // 檢查是否有磚塊使用舊值（1-4）— 這些直接映射至 FLOOR_1-4
+  // 但需要色彩設定
   const tileColors: Array<FloorColor | null> = []
   for (const tile of layout.tiles) {
     switch (tile) {
-      case 0: // WALL
+      case 0: // 牆壁
         tileColors.push(null)
         break
-      case 1: // was TILE_FLOOR → FLOOR_1 beige
+      case 1: // 原 TILE_FLOOR → FLOOR_1 米色
         tileColors.push(DEFAULT_LEFT_ROOM_COLOR)
         break
-      case 2: // was WOOD_FLOOR → FLOOR_2 brown
+      case 2: // 原 WOOD_FLOOR → FLOOR_2 棕色
         tileColors.push(DEFAULT_RIGHT_ROOM_COLOR)
         break
-      case 3: // was CARPET → FLOOR_3 purple
+      case 3: // 原 CARPET → FLOOR_3 紫色
         tileColors.push(DEFAULT_CARPET_COLOR)
         break
-      case 4: // was DOORWAY → FLOOR_4 tan
+      case 4: // 原 DOORWAY → FLOOR_4 棕褐色
         tileColors.push(DEFAULT_DOORWAY_COLOR)
         break
       default:
-        // New tile types (5-7) without colors — use neutral gray
+        // 新磚塊類型（5-7）無色彩 — 使用中性灰
         tileColors.push(tile > 0 ? { h: 0, s: 0, b: 0, c: 0 } : null)
     }
   }

@@ -38,9 +38,9 @@ export class OfficeState {
   cameraFollowId: number | null = null
   hoveredAgentId: number | null = null
   hoveredTile: { col: number; row: number } | null = null
-  /** Maps "parentId:toolId" → sub-agent character ID (negative) */
+  /** 映射 "parentId:toolId" → 子代理角色 ID（負數） */
   subagentIdMap: Map<string, number> = new Map()
-  /** Reverse lookup: sub-agent character ID → parent info */
+  /** 反向查找：子代理角色 ID → 父代理資訊 */
   subagentMeta: Map<number, { parentAgentId: number; parentToolId: string }> = new Map()
   private nextSubagentId = -1
 
@@ -53,8 +53,8 @@ export class OfficeState {
     this.walkableTiles = getWalkableTiles(this.tileMap, this.blockedTiles)
   }
 
-  /** Rebuild all derived state from a new layout. Reassigns existing characters.
-   *  @param shift Optional pixel shift to apply when grid expands left/up */
+  /** 從新佈局重建所有衍生狀態。重新分配現有角色。
+   *  @param shift 當網格向左/上擴展時套用的可選位移 */
   rebuildFromLayout(layout: OfficeLayout, shift?: { col: number; row: number }): void {
     this.layout = layout
     this.tileMap = layoutToTileMap(layout)
@@ -63,31 +63,31 @@ export class OfficeState {
     this.rebuildFurnitureInstances()
     this.walkableTiles = getWalkableTiles(this.tileMap, this.blockedTiles)
 
-    // Shift character positions when grid expands left/up
+    // 當網格向左/上擴展時移動角色位置
     if (shift && (shift.col !== 0 || shift.row !== 0)) {
       for (const ch of this.characters.values()) {
         ch.tileCol += shift.col
         ch.tileRow += shift.row
         ch.x += shift.col * TILE_SIZE
         ch.y += shift.row * TILE_SIZE
-        // Clear path since tile coords changed
+        // 清除路徑，因為格座標已變更
         ch.path = []
         ch.moveProgress = 0
       }
     }
 
-    // Reassign characters to new seats, preserving existing assignments when possible
+    // 重新分配角色至新座位，盡可能保留現有的分配
     for (const seat of this.seats.values()) {
       seat.assigned = false
     }
 
-    // First pass: try to keep characters at their existing seats
+    // 第一輪：嘗試保留角色在現有座位
     for (const ch of this.characters.values()) {
       if (ch.seatId && this.seats.has(ch.seatId)) {
         const seat = this.seats.get(ch.seatId)!
         if (!seat.assigned) {
           seat.assigned = true
-          // Snap character to seat position
+          // 將角色對齊至座位位置
           ch.tileCol = seat.seatCol
           ch.tileRow = seat.seatRow
           const cx = seat.seatCol * TILE_SIZE + TILE_SIZE / 2
@@ -98,10 +98,10 @@ export class OfficeState {
           continue
         }
       }
-      ch.seatId = null // will be reassigned below
+      ch.seatId = null // 將在下方重新分配
     }
 
-    // Second pass: assign remaining characters to free seats
+    // 第二輪：將剩餘角色分配至空閒座位
     for (const ch of this.characters.values()) {
       if (ch.seatId) continue
       const seatId = this.findFreeSeat()
@@ -117,16 +117,16 @@ export class OfficeState {
       }
     }
 
-    // Relocate any characters that ended up outside bounds or on non-walkable tiles
+    // 重新定位超出邊界或在不可行走格上的角色
     for (const ch of this.characters.values()) {
-      if (ch.seatId) continue // seated characters are fine
+      if (ch.seatId) continue // 已有座位的角色沒問題
       if (ch.tileCol < 0 || ch.tileCol >= layout.cols || ch.tileRow < 0 || ch.tileRow >= layout.rows) {
         this.relocateCharacterToWalkable(ch)
       }
     }
   }
 
-  /** Move a character to a random walkable tile */
+  /** 將角色移動到隨機的可行走格 */
   private relocateCharacterToWalkable(ch: Character): void {
     if (this.walkableTiles.length === 0) return
     const spawn = this.walkableTiles[Math.floor(Math.random() * this.walkableTiles.length)]
@@ -142,7 +142,7 @@ export class OfficeState {
     return this.layout
   }
 
-  /** Get the blocked-tile key for a character's own seat, or null */
+  /** 取得角色自身座位的封鎖格鍵值，若無則回傳 null */
   private ownSeatKey(ch: Character): string | null {
     if (!ch.seatId) return null
     const seat = this.seats.get(ch.seatId)
@@ -150,7 +150,7 @@ export class OfficeState {
     return `${seat.seatCol},${seat.seatRow}`
   }
 
-  /** Temporarily unblock a character's own seat, run fn, then re-block */
+  /** 暫時解除角色自身座位的封鎖，執行函式，然後重新封鎖 */
   private withOwnSeatUnblocked<T>(ch: Character, fn: () => T): T {
     const key = this.ownSeatKey(ch)
     if (key) this.blockedTiles.delete(key)
@@ -167,25 +167,25 @@ export class OfficeState {
   }
 
   /**
-   * Pick a diverse palette for a new agent based on currently active agents.
-   * First 6 agents each get a unique skin (random order). Beyond 6, skins
-   * repeat in balanced rounds with a random hue shift (≥45°).
+   * 根據當前活躍代理為新代理選擇多元調色盤。
+   * 前 6 個代理各獲得唯一外觀（隨機順序）。超過 6 個後，
+   * 外觀以均衡輪次重複並套用隨機色相偏移（≥45°）。
    */
   private pickDiversePalette(): { palette: number; hueShift: number } {
-    // Count how many non-sub-agents use each base palette (0-5)
+    // 計算每個基本調色盤（0-5）有多少非子代理使用
     const counts = new Array(PALETTE_COUNT).fill(0) as number[]
     for (const ch of this.characters.values()) {
       if (ch.isSubagent) continue
       counts[ch.palette]++
     }
     const minCount = Math.min(...counts)
-    // Available = palettes at the minimum count (least used)
+    // 可用 = 使用次數最少的調色盤
     const available: number[] = []
     for (let i = 0; i < PALETTE_COUNT; i++) {
       if (counts[i] === minCount) available.push(i)
     }
     const palette = available[Math.floor(Math.random() * available.length)]
-    // First round (minCount === 0): no hue shift. Subsequent rounds: random ≥45°.
+    // 第一輪（minCount === 0）：無色相偏移。後續輪次：隨機 ≥45°。
     let hueShift = 0
     if (minCount > 0) {
       hueShift = HUE_SHIFT_MIN_DEG + Math.floor(Math.random() * HUE_SHIFT_RANGE_DEG)
@@ -207,7 +207,7 @@ export class OfficeState {
       hueShift = pick.hueShift
     }
 
-    // Try preferred seat first, then any free seat
+    // 先嘗試偏好座位，再嘗試任何空閒座位
     let seatId: string | null = null
     if (preferredSeatId && this.seats.has(preferredSeatId)) {
       const seat = this.seats.get(preferredSeatId)!
@@ -225,7 +225,7 @@ export class OfficeState {
       seat.assigned = true
       ch = createCharacter(id, palette, seatId, seat, hueShift)
     } else {
-      // No seats — spawn at random walkable tile
+      // 沒有座位 — 在隨機可行走格生成
       const spawn = this.walkableTiles.length > 0
         ? this.walkableTiles[Math.floor(Math.random() * this.walkableTiles.length)]
         : { col: 1, row: 1 }
@@ -247,22 +247,22 @@ export class OfficeState {
   removeAgent(id: number): void {
     const ch = this.characters.get(id)
     if (!ch) return
-    if (ch.matrixEffect === 'despawn') return // already despawning
-    // Free seat and clear selection immediately
+    if (ch.matrixEffect === 'despawn') return // 已在消散中
+    // 立即釋放座位並清除選取
     if (ch.seatId) {
       const seat = this.seats.get(ch.seatId)
       if (seat) seat.assigned = false
     }
     if (this.selectedAgentId === id) this.selectedAgentId = null
     if (this.cameraFollowId === id) this.cameraFollowId = null
-    // Start despawn animation instead of immediate delete
+    // 啟動消散動畫而非立即刪除
     ch.matrixEffect = 'despawn'
     ch.matrixEffectTimer = 0
     ch.matrixEffectSeeds = matrixEffectSeeds()
     ch.bubbleType = null
   }
 
-  /** Find seat uid at a given tile position, or null */
+  /** 在指定格位置找到座位 uid，若無則回傳 null */
   getSeatAtTile(col: number, row: number): string | null {
     for (const [uid, seat] of this.seats) {
       if (seat.seatCol === col && seat.seatRow === row) return uid
@@ -270,21 +270,21 @@ export class OfficeState {
     return null
   }
 
-  /** Reassign an agent from their current seat to a new seat */
+  /** 將代理從當前座位重新分配至新座位 */
   reassignSeat(agentId: number, seatId: string): void {
     const ch = this.characters.get(agentId)
     if (!ch) return
-    // Unassign old seat
+    // 取消舊座位分配
     if (ch.seatId) {
       const old = this.seats.get(ch.seatId)
       if (old) old.assigned = false
     }
-    // Assign new seat
+    // 分配新座位
     const seat = this.seats.get(seatId)
     if (!seat || seat.assigned) return
     seat.assigned = true
     ch.seatId = seatId
-    // Pathfind to new seat (unblock own seat tile for this query)
+    // 尋路至新座位（為此查詢解除自身座位格的封鎖）
     const path = this.withOwnSeatUnblocked(ch, () =>
       findPath(ch.tileCol, ch.tileRow, seat.seatCol, seat.seatRow, this.tileMap, this.blockedTiles)
     )
@@ -295,7 +295,7 @@ export class OfficeState {
       ch.frame = 0
       ch.frameTimer = 0
     } else {
-      // Already at seat or no path — sit down
+      // 已在座位上或無路徑 — 坐下
       ch.state = CharacterState.TYPE
       ch.dir = seat.facingDir
       ch.frame = 0
@@ -306,7 +306,7 @@ export class OfficeState {
     }
   }
 
-  /** Send an agent back to their currently assigned seat */
+  /** 將代理送回其當前分配的座位 */
   sendToSeat(agentId: number): void {
     const ch = this.characters.get(agentId)
     if (!ch || !ch.seatId) return
@@ -322,7 +322,7 @@ export class OfficeState {
       ch.frame = 0
       ch.frameTimer = 0
     } else {
-      // Already at seat — sit down
+      // 已在座位上 — 坐下
       ch.state = CharacterState.TYPE
       ch.dir = seat.facingDir
       ch.frame = 0
@@ -333,12 +333,12 @@ export class OfficeState {
     }
   }
 
-  /** Walk an agent to an arbitrary walkable tile (right-click command) */
+  /** 將代理步行至任意可行走格（右鍵指令） */
   walkToTile(agentId: number, col: number, row: number): boolean {
     const ch = this.characters.get(agentId)
     if (!ch || ch.isSubagent) return false
     if (!isWalkable(col, row, this.tileMap, this.blockedTiles)) {
-      // Also allow walking to own seat tile (blocked for others but not self)
+      // 也允許走到自身座位格（對其他人封鎖但對自己不封鎖）
       const key = this.ownSeatKey(ch)
       if (!key || key !== `${col},${row}`) return false
     }
@@ -354,7 +354,7 @@ export class OfficeState {
     return true
   }
 
-  /** Create a sub-agent character with the parent's palette. Returns the sub-agent ID. */
+  /** 建立具有父代理調色盤的子代理角色。回傳子代理 ID。 */
   addSubagent(parentAgentId: number, parentToolId: string): number {
     const key = `${parentAgentId}:${parentToolId}`
     if (this.subagentIdMap.has(key)) return this.subagentIdMap.get(key)!
@@ -364,7 +364,7 @@ export class OfficeState {
     const palette = parentCh ? parentCh.palette : 0
     const hueShift = parentCh ? parentCh.hueShift : 0
 
-    // Find the free seat closest to the parent agent
+    // 找到最接近父代理的空閒座位
     const parentCol = parentCh ? parentCh.tileCol : 0
     const parentRow = parentCh ? parentCh.tileRow : 0
     const dist = (c: number, r: number) =>
@@ -388,7 +388,7 @@ export class OfficeState {
       seat.assigned = true
       ch = createCharacter(id, palette, bestSeatId, seat, hueShift)
     } else {
-      // No seats — spawn at closest walkable tile to parent
+      // 沒有座位 — 在最接近父代理的可行走格生成
       let spawn = { col: 1, row: 1 }
       if (this.walkableTiles.length > 0) {
         let closest = this.walkableTiles[0]
@@ -420,7 +420,7 @@ export class OfficeState {
     return id
   }
 
-  /** Remove a specific sub-agent character and free its seat */
+  /** 移除特定子代理角色並釋放其座位 */
   removeSubagent(parentAgentId: number, parentToolId: string): void {
     const key = `${parentAgentId}:${parentToolId}`
     const id = this.subagentIdMap.get(key)
@@ -429,7 +429,7 @@ export class OfficeState {
     const ch = this.characters.get(id)
     if (ch) {
       if (ch.matrixEffect === 'despawn') {
-        // Already despawning — just clean up maps
+        // 已在消散中 — 僅清理映射
         this.subagentIdMap.delete(key)
         this.subagentMeta.delete(id)
         return
@@ -438,20 +438,20 @@ export class OfficeState {
         const seat = this.seats.get(ch.seatId)
         if (seat) seat.assigned = false
       }
-      // Start despawn animation — keep character in map for rendering
+      // 啟動消散動畫 — 保留角色在映射中供渲染使用
       ch.matrixEffect = 'despawn'
       ch.matrixEffectTimer = 0
       ch.matrixEffectSeeds = matrixEffectSeeds()
       ch.bubbleType = null
     }
-    // Clean up tracking maps immediately so keys don't collide
+    // 立即清理追蹤映射以避免鍵值衝突
     this.subagentIdMap.delete(key)
     this.subagentMeta.delete(id)
     if (this.selectedAgentId === id) this.selectedAgentId = null
     if (this.cameraFollowId === id) this.cameraFollowId = null
   }
 
-  /** Remove all sub-agents belonging to a parent agent */
+  /** 移除屬於某父代理的所有子代理 */
   removeAllSubagents(parentAgentId: number): void {
     const toRemove: string[] = []
     for (const [key, id] of this.subagentIdMap) {
@@ -460,7 +460,7 @@ export class OfficeState {
         const ch = this.characters.get(id)
         if (ch) {
           if (ch.matrixEffect === 'despawn') {
-            // Already despawning — just clean up maps
+            // 已在消散中 — 僅清理映射
             this.subagentMeta.delete(id)
             toRemove.push(key)
             continue
@@ -469,7 +469,7 @@ export class OfficeState {
             const seat = this.seats.get(ch.seatId)
             if (seat) seat.assigned = false
           }
-          // Start despawn animation
+          // 啟動消散動畫
           ch.matrixEffect = 'despawn'
           ch.matrixEffectTimer = 0
           ch.matrixEffectSeeds = matrixEffectSeeds()
@@ -486,7 +486,7 @@ export class OfficeState {
     }
   }
 
-  /** Look up the sub-agent character ID for a given parent+toolId, or null */
+  /** 查找指定 parent+toolId 的子代理角色 ID，若無則回傳 null */
   getSubagentId(parentAgentId: number, parentToolId: string): number | null {
     return this.subagentIdMap.get(`${parentAgentId}:${parentToolId}`) ?? null
   }
@@ -510,8 +510,8 @@ export class OfficeState {
     if (ch) {
       ch.isActive = active
       if (!active) {
-        // Sentinel -1: signals turn just ended, skip next seat rest timer.
-        // Prevents the WALK handler from setting a 2-4 min rest on arrival.
+        // 哨兵值 -1：表示回合剛結束，跳過下一次座位休息計時器。
+        // 防止 WALK 處理器在抵達時設定 2-4 分鐘的休息。
         ch.seatTimer = -1
         ch.path = []
         ch.moveProgress = 0
@@ -520,33 +520,33 @@ export class OfficeState {
     }
   }
 
-  /** Rebuild furniture instances with auto-state applied (active agents turn electronics ON) */
+  /** 重建家具實例並套用自動狀態（活躍代理將電子設備切換為 ON） */
   private rebuildFurnitureInstances(): void {
-    // Collect tiles where active agents face desks
+    // 收集活躍代理面對書桌的格位
     const autoOnTiles = new Set<string>()
     for (const ch of this.characters.values()) {
       if (!ch.isActive || !ch.seatId) continue
       const seat = this.seats.get(ch.seatId)
       if (!seat) continue
-      // Find the desk tile(s) the agent faces from their seat
+      // 找到代理從座位面對的書桌格位
       const dCol = seat.facingDir === Direction.RIGHT ? 1 : seat.facingDir === Direction.LEFT ? -1 : 0
       const dRow = seat.facingDir === Direction.DOWN ? 1 : seat.facingDir === Direction.UP ? -1 : 0
-      // Check tiles in the facing direction (desk could be 1-3 tiles deep)
+      // 檢查面向方向的格位（書桌可能有 1-3 格深）
       for (let d = 1; d <= AUTO_ON_FACING_DEPTH; d++) {
         const tileCol = seat.seatCol + dCol * d
         const tileRow = seat.seatRow + dRow * d
         autoOnTiles.add(`${tileCol},${tileRow}`)
       }
-      // Also check tiles to the sides of the facing direction (desks can be wide)
+      // 也檢查面向方向兩側的格位（書桌可能很寬）
       for (let d = 1; d <= AUTO_ON_SIDE_DEPTH; d++) {
         const baseCol = seat.seatCol + dCol * d
         const baseRow = seat.seatRow + dRow * d
         if (dCol !== 0) {
-          // Facing left/right: check tiles above and below
+          // 面向左/右：檢查上下的格位
           autoOnTiles.add(`${baseCol},${baseRow - 1}`)
           autoOnTiles.add(`${baseCol},${baseRow + 1}`)
         } else {
-          // Facing up/down: check tiles left and right
+          // 面向上/下：檢查左右的格位
           autoOnTiles.add(`${baseCol - 1},${baseRow}`)
           autoOnTiles.add(`${baseCol + 1},${baseRow}`)
         }
@@ -558,11 +558,11 @@ export class OfficeState {
       return
     }
 
-    // Build modified furniture list with auto-state applied
+    // 建構套用自動狀態的修改後家具列表
     const modifiedFurniture: PlacedFurniture[] = this.layout.furniture.map((item) => {
       const entry = getCatalogEntry(item.type)
       if (!entry) return item
-      // Check if any tile of this furniture overlaps an auto-on tile
+      // 檢查此家具的任何格位是否與自動開啟格重疊
       for (let dr = 0; dr < entry.footprintH; dr++) {
         for (let dc = 0; dc < entry.footprintW; dc++) {
           if (autoOnTiles.has(`${item.col + dc},${item.row + dr}`)) {
@@ -611,7 +611,7 @@ export class OfficeState {
     }
   }
 
-  /** Dismiss bubble on click — permission: instant, waiting: quick fade */
+  /** 點擊關閉氣泡 — 權限：立即消失，等待：快速淡出 */
   dismissBubble(id: number): void {
     const ch = this.characters.get(id)
     if (!ch || !ch.bubbleType) return
@@ -619,7 +619,7 @@ export class OfficeState {
       ch.bubbleType = null
       ch.bubbleTimer = 0
     } else if (ch.bubbleType === 'waiting') {
-      // Trigger immediate fade (0.3s remaining)
+      // 觸發立即淡出（剩餘 0.3s）
       ch.bubbleTimer = Math.min(ch.bubbleTimer, DISMISS_BUBBLE_FAST_FADE_SEC)
     }
   }
@@ -627,29 +627,29 @@ export class OfficeState {
   update(dt: number): void {
     const toDelete: number[] = []
     for (const ch of this.characters.values()) {
-      // Handle matrix effect animation
+      // 處理 Matrix 特效動畫
       if (ch.matrixEffect) {
         ch.matrixEffectTimer += dt
         if (ch.matrixEffectTimer >= MATRIX_EFFECT_DURATION) {
           if (ch.matrixEffect === 'spawn') {
-            // Spawn complete — clear effect, resume normal FSM
+            // 生成完成 — 清除特效，恢復正常 FSM
             ch.matrixEffect = null
             ch.matrixEffectTimer = 0
             ch.matrixEffectSeeds = []
           } else {
-            // Despawn complete — mark for deletion
+            // 消散完成 — 標記為待刪除
             toDelete.push(ch.id)
           }
         }
-        continue // skip normal FSM while effect is active
+        continue // 特效啟用期間跳過正常 FSM
       }
 
-      // Temporarily unblock own seat so character can pathfind to it
+      // 暫時解除自身座位封鎖，讓角色可以尋路至座位
       this.withOwnSeatUnblocked(ch, () =>
         updateCharacter(ch, dt, this.walkableTiles, this.seats, this.tileMap, this.blockedTiles)
       )
 
-      // Tick bubble timer for waiting bubbles (not permission/detached)
+      // 遞減等待氣泡的計時器（不含權限/斷線氣泡）
       if (ch.bubbleType === 'waiting') {
         ch.bubbleTimer -= dt
         if (ch.bubbleTimer <= 0) {
@@ -658,7 +658,7 @@ export class OfficeState {
         }
       }
     }
-    // Remove characters that finished despawn
+    // 移除已完成消散的角色
     for (const id of toDelete) {
       this.characters.delete(id)
     }
@@ -668,14 +668,14 @@ export class OfficeState {
     return Array.from(this.characters.values())
   }
 
-  /** Get character at pixel position (for hit testing). Returns id or null. */
+  /** 取得指定像素位置的角色（用於點擊測試）。回傳 id 或 null。 */
   getCharacterAt(worldX: number, worldY: number): number | null {
     const chars = this.getCharacters().sort((a, b) => b.y - a.y)
     for (const ch of chars) {
-      // Skip characters that are despawning
+      // 跳過正在消散的角色
       if (ch.matrixEffect === 'despawn') continue
-      // Character sprite is 16x24, anchored bottom-center
-      // Apply sitting offset to match visual position
+      // 角色精靈圖為 16x24，錨點在底部中央
+      // 套用坐姿偏移以匹配視覺位置
       const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0
       const anchorY = ch.y + sittingOffset
       const left = ch.x - CHARACTER_HIT_HALF_WIDTH

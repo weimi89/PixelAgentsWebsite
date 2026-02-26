@@ -42,19 +42,19 @@ export async function playDoneSound(): Promise<void> {
     if (!audioCtx) {
       audioCtx = new AudioContext()
     }
-    // Resume suspended context (webviews suspend until user gesture)
+    // 恢復暫停的 context（webview 在使用者操作前會暫停）
     if (audioCtx.state === 'suspended') {
       await audioCtx.resume()
     }
-    // Ascending two-note chime: E5 → B5
+    // 上行雙音提示音：E5 → B5
     playNote(audioCtx, NOTIFICATION_NOTE_1_HZ, NOTIFICATION_NOTE_1_START_SEC)
     playNote(audioCtx, NOTIFICATION_NOTE_2_HZ, NOTIFICATION_NOTE_2_START_SEC)
   } catch {
-    // Audio may not be available
+    // 音訊可能不可用
   }
 }
 
-/** Call from any user-gesture handler to ensure AudioContext is unlocked */
+/** 從任何使用者手勢處理器呼叫，以確保 AudioContext 已解鎖 */
 export function unlockAudio(): void {
   try {
     if (!audioCtx) {
@@ -64,6 +64,6 @@ export function unlockAudio(): void {
       audioCtx.resume()
     }
   } catch {
-    // ignore
+    // 忽略
   }
 }

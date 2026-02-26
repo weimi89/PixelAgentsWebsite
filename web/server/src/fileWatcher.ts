@@ -16,7 +16,7 @@ export function startFileWatching(
 	permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
 	sender: MessageSender | undefined,
 ): void {
-	// Primary: fs.watch
+	// 主要方式：fs.watch
 	try {
 		const watcher = fs.watch(filePath, () => {
 			readNewLines(agentId, agents, waitingTimers, permissionTimers, sender);
@@ -26,7 +26,7 @@ export function startFileWatching(
 		console.log(`[Pixel Agents] fs.watch failed for agent ${agentId}: ${e}`);
 	}
 
-	// Backup: poll every 2s
+	// 備援：每 2 秒輪詢
 	const interval = setInterval(() => {
 		if (!agents.has(agentId)) { clearInterval(interval); return; }
 		readNewLines(agentId, agents, waitingTimers, permissionTimers, sender);
@@ -79,7 +79,7 @@ export function readNewLines(
 	}
 }
 
-/** Check if a JSONL file was recently modified (considered "active") */
+/** 檢查 JSONL 檔案是否最近被修改過（視為「活躍」） */
 function isRecentlyActive(filePath: string): boolean {
 	try {
 		const stat = fs.statSync(filePath);
@@ -89,7 +89,7 @@ function isRecentlyActive(filePath: string): boolean {
 	}
 }
 
-/** Check if a JSONL file is already tracked by an existing agent */
+/** 檢查 JSONL 檔案是否已被現有代理追蹤 */
 function isTrackedByAgent(filePath: string, agents: Map<number, AgentState>): boolean {
 	for (const agent of agents.values()) {
 		if (agent.jsonlFile === filePath) return true;
@@ -113,7 +113,7 @@ export function ensureProjectScan(
 ): void {
 	if (projectScanTimerRef.current) return;
 
-	// Initial scan: adopt all active JSONL files across all project directories
+	// 初始掃描：收養所有專案目錄中的活躍 JSONL 檔案
 	for (const dir of projectDirs) {
 		scanAndAdopt(
 			dir, knownJsonlFiles, nextAgentIdRef, agents,
@@ -122,7 +122,7 @@ export function ensureProjectScan(
 		);
 	}
 
-	// Periodic scan for new sessions
+	// 定期掃描新會話
 	projectScanTimerRef.current = setInterval(() => {
 		for (const dir of projectDirs) {
 			scanAndAdopt(
@@ -157,17 +157,17 @@ function scanAndAdopt(
 	for (const file of files) {
 		knownJsonlFiles.add(file);
 
-		// Skip files already tracked by an agent
+		// 跳過已被代理追蹤的檔案
 		if (isTrackedByAgent(file, agents)) continue;
 
-		// Only adopt recently active files
+		// 僅收養最近活躍的檔案
 		if (!isRecentlyActive(file)) continue;
 
-		// Auto-adopt: create agent for this external Claude session
+		// 自動收養：為此外部 Claude 會話建立代理
 		const id = nextAgentIdRef.current++;
 		const agent: AgentState = {
 			id,
-			process: null, // external process — not managed by us
+			process: null, // 外部進程 — 非我們管理
 			projectDir,
 			jsonlFile: file,
 			fileOffset: 0,
@@ -189,16 +189,16 @@ function scanAndAdopt(
 		console.log(`[Pixel Agents] Auto-adopted session: ${path.basename(file)} → Agent ${id}`);
 		sender?.postMessage({ type: 'agentCreated', id });
 
-		// Start watching the file immediately
+		// 立即開始監視檔案
 		startFileWatching(id, file, agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, sender);
 		readNewLines(id, agents, waitingTimers, permissionTimers, sender);
 	}
 
-	// Check for stale agents (JSONL file no longer being written to)
+	// 檢查過期代理（JSONL 檔案不再被寫入）
 	checkStaleAgents(agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, jsonlPollTimers, knownJsonlFiles, sender, persistAgents);
 }
 
-/** Remove agents whose JSONL file hasn't been updated recently and have no managed process */
+/** 移除 JSONL 檔案最近未更新且沒有受管理進程的代理 */
 function checkStaleAgents(
 	agents: Map<number, AgentState>,
 	fileWatchers: Map<number, fs.FSWatcher>,
@@ -212,18 +212,18 @@ function checkStaleAgents(
 ): void {
 	const staleIds: number[] = [];
 	for (const [id, agent] of agents) {
-		// Only check auto-adopted agents (no managed process, no tmux session)
+		// 僅檢查自動收養的代理（無受管理的進程、無 tmux 會話）
 		if (agent.process || agent.tmuxSessionName) continue;
 		try {
 			const stat = fs.statSync(agent.jsonlFile);
 			const age = Date.now() - stat.mtimeMs;
-			// If file hasn't been touched in 2× the threshold, consider stale
+			// 如果檔案超過 2 倍閾值未被存取，視為過期
 			if (age > ACTIVE_JSONL_MAX_AGE_MS * 2) {
 				console.log(`[Pixel Agents] Agent ${id}: session stale (${Math.round(age / 1000)}s), removing`);
 				staleIds.push(id);
 			}
 		} catch {
-			// File gone — remove agent
+			// 檔案已消失 — 移除代理
 			staleIds.push(id);
 		}
 	}

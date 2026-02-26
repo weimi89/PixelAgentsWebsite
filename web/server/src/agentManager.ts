@@ -16,12 +16,12 @@ import {
 	parseSessionUuid,
 } from './tmuxManager.js';
 
-// Resolve full path to claude binary at startup
+// 啟動時解析 claude 二進位檔案的完整路徑
 const CLAUDE_BIN = (() => {
 	try {
 		return execSync('which claude', { encoding: 'utf-8' }).trim();
 	} catch {
-		return 'claude'; // fallback
+		return 'claude'; // 備選
 	}
 })();
 
@@ -42,7 +42,7 @@ export function getAllProjectDirs(): string[] {
 	}
 }
 
-// ── Persistence ─────────────────────────────────────────────
+// ── 持久化 ─────────────────────────────────────────────
 
 function getAgentsFilePath(): string {
 	return path.join(os.homedir(), LAYOUT_FILE_DIR, AGENTS_FILE_NAME);
@@ -51,7 +51,7 @@ function getAgentsFilePath(): string {
 export function savePersistedAgents(agents: Map<number, AgentState>): void {
 	const data: PersistedAgent[] = [];
 	for (const agent of agents.values()) {
-		// Extract session ID from JSONL filename
+		// 從 JSONL 檔名中提取會話 ID
 		const sessionId = path.basename(agent.jsonlFile, '.jsonl');
 		data.push({
 			id: agent.id,
@@ -83,7 +83,7 @@ export function loadPersistedAgents(): PersistedAgent[] {
 	}
 }
 
-// ── Helper: build a clean env without CLAUDE* vars ──────────
+// ── 輔助函式：建構不含 CLAUDE* 變數的乾淨環境 ──────────
 
 function buildCleanEnv(): Record<string, string | undefined> {
 	const cleanEnv = { ...process.env };
@@ -95,7 +95,7 @@ function buildCleanEnv(): Record<string, string | undefined> {
 	return cleanEnv;
 }
 
-// ── Helper: create agent state and start file polling ───────
+// ── 輔助函式：建立代理狀態並啟動檔案輪詢 ───────
 
 function createAgentState(
 	id: number,
@@ -109,7 +109,7 @@ function createAgentState(
 		if (fs.existsSync(expectedFile)) {
 			fileOffset = fs.statSync(expectedFile).size;
 		}
-	} catch { /* ignore */ }
+	} catch { /* 忽略 */ }
 
 	return {
 		id,
@@ -132,7 +132,7 @@ function createAgentState(
 	};
 }
 
-// ── Shared spawn logic ──────────────────────────────────────
+// ── 共用的生成邏輯 ──────────────────────────────────────
 
 function spawnClaudeAgent(
 	args: string[],
@@ -162,7 +162,7 @@ function spawnClaudeAgent(
 	let tmuxName: string | null = null;
 
 	if (useTmux) {
-		// Spawn inside tmux for persistence
+		// 在 tmux 中生成以實現持久化
 		tmuxName = buildTmuxName(sessionUuid);
 		console.log(`[Pixel Agents] Using tmux session: ${tmuxName}`);
 		createTmuxSession(tmuxName, CLAUDE_BIN, args, cwd, cleanEnv);
@@ -173,7 +173,7 @@ function spawnClaudeAgent(
 	const agent = createAgentState(id, expectedFile, projectDir, tmuxName, false);
 
 	if (!useTmux) {
-		// Direct spawn — track the process
+		// 直接生成 — 追蹤進程
 		console.log(`[Pixel Agents] Using claude binary: ${CLAUDE_BIN}`);
 		const proc = spawn(CLAUDE_BIN, args, {
 			cwd,
@@ -218,7 +218,7 @@ function spawnClaudeAgent(
 				startFileWatching(id, agent.jsonlFile, agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, sender);
 				readNewLines(id, agents, waitingTimers, permissionTimers, sender);
 			}
-		} catch { /* file may not exist yet */ }
+		} catch { /* 檔案可能尚不存在 */ }
 	}, JSONL_POLL_INTERVAL_MS);
 	jsonlPollTimers.set(id, pollTimer);
 }
@@ -293,7 +293,7 @@ export function removeAgent(
 	const agent = agents.get(agentId);
 	if (!agent) return;
 
-	// Allow re-adoption if this session becomes active again
+	// 允許此會話再次活躍時被重新收養
 	knownJsonlFiles.delete(agent.jsonlFile);
 
 	const jpTimer = jsonlPollTimers.get(agentId);
@@ -328,12 +328,12 @@ export function closeAgent(
 	const agent = agents.get(agentId);
 	if (!agent) return;
 
-	// Kill the tmux session if present
+	// 如果存在 tmux 會話則終止
 	if (agent.tmuxSessionName) {
 		killTmuxSession(agent.tmuxSessionName);
 	}
 
-	// Kill the direct process if present
+	// 如果存在直接進程則終止
 	if (agent.process && !agent.process.killed) {
 		agent.process.kill('SIGTERM');
 	}
@@ -342,7 +342,7 @@ export function closeAgent(
 	sender?.postMessage({ type: 'agentClosed', id: agentId });
 }
 
-// ── tmux recovery on server restart ─────────────────────────
+// ── 伺服器重啟時的 tmux 恢復 ─────────────────────────
 
 export function recoverTmuxAgents(
 	nextAgentIdRef: { current: number },
@@ -357,11 +357,11 @@ export function recoverTmuxAgents(
 ): number {
 	if (!isTmuxAvailable()) return 0;
 
-	// Find all live pixel-agents tmux sessions
+	// 找出所有存活的 pixel-agents tmux 會話
 	const liveSessions = listPixelAgentSessions();
 	if (liveSessions.length === 0) return 0;
 
-	// Load persisted agent data to match tmux sessions with JSONL files
+	// 載入持久化的代理資料，以將 tmux 會話與 JSONL 檔案配對
 	const persisted = loadPersistedAgents();
 	const persistedMap = new Map<string, PersistedAgent>();
 	for (const p of persisted) {
@@ -372,7 +372,7 @@ export function recoverTmuxAgents(
 
 	let recovered = 0;
 	for (const sessionName of liveSessions) {
-		// Try to find this session in persisted data
+		// 嘗試在持久化資料中找到此會話
 		let jsonlFile: string | null = null;
 		let projectDir: string | null = null;
 
@@ -381,7 +381,7 @@ export function recoverTmuxAgents(
 			jsonlFile = match.jsonlFile;
 			projectDir = match.projectDir;
 		} else {
-			// Fallback: try to find JSONL by UUID extracted from session name
+			// 備選：嘗試透過從會話名稱提取的 UUID 尋找 JSONL
 			const uuid = parseSessionUuid(sessionName);
 			if (uuid) {
 				const allDirs = getAllProjectDirs();
@@ -401,20 +401,20 @@ export function recoverTmuxAgents(
 			continue;
 		}
 
-		// Skip if already adopted
+		// 如果已被收養則跳過
 		if (knownJsonlFiles.has(jsonlFile)) continue;
 		knownJsonlFiles.add(jsonlFile);
 
 		const id = nextAgentIdRef.current++;
 		const agent = createAgentState(id, jsonlFile, projectDir, sessionName, false);
-		// Read from beginning to rebuild state
+		// 從頭讀取以重建狀態
 		agent.fileOffset = 0;
 		agents.set(id, agent);
 
 		console.log(`[Pixel Agents] Recovered tmux agent ${id}: ${sessionName}`);
 		sender?.postMessage({ type: 'agentCreated', id });
 
-		// Start file watching
+		// 啟動檔案監視
 		startFileWatching(id, jsonlFile, agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, sender);
 		readNewLines(id, agents, waitingTimers, permissionTimers, sender);
 
@@ -429,7 +429,7 @@ export function recoverTmuxAgents(
 	return recovered;
 }
 
-// ── tmux health check ───────────────────────────────────────
+// ── tmux 健康檢查 ───────────────────────────────────────
 
 export function checkTmuxHealth(
 	agents: Map<number, AgentState>,
@@ -470,7 +470,7 @@ export function sendExistingAgents(
 		agentMeta,
 	});
 
-	// Re-send current states
+	// 重新傳送當前狀態
 	for (const [agentId, agent] of agents) {
 		if (agent.model) {
 			sender.postMessage({

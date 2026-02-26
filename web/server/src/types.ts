@@ -20,9 +20,9 @@ export interface AgentState {
 	permissionSent: boolean;
 	hadToolsInTurn: boolean;
 	model: string | null;
-	/** tmux session name, or null if running as direct child process */
+	/** tmux 會話名稱，如果作為直接子進程執行則為 null */
 	tmuxSessionName: string | null;
-	/** Whether this agent's tmux session is alive but server just restarted (not yet reattached) */
+	/** 此代理的 tmux 會話是否存活但伺服器剛重啟（尚未重新連接） */
 	isDetached: boolean;
 }
 

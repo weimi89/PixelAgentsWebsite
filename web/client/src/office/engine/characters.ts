@@ -14,7 +14,7 @@ import {
   SEAT_REST_MAX_SEC,
 } from '../../constants.js'
 
-/** Tools that show reading animation instead of typing */
+/** 顯示閱讀動畫而非打字動畫的工具 */
 const READING_TOOLS = new Set(['Read', 'Grep', 'Glob', 'WebFetch', 'WebSearch'])
 
 export function isReadingTool(tool: string | null): boolean {
@@ -22,7 +22,7 @@ export function isReadingTool(tool: string | null): boolean {
   return READING_TOOLS.has(tool)
 }
 
-/** Pixel center of a tile */
+/** 格的像素中心 */
 function tileCenter(col: number, row: number): { x: number; y: number } {
   return {
     x: col * TILE_SIZE + TILE_SIZE / 2,
@@ -30,7 +30,7 @@ function tileCenter(col: number, row: number): { x: number; y: number } {
   }
 }
 
-/** Direction from one tile to an adjacent tile */
+/** 從一格到相鄰格的方向 */
 function directionBetween(fromCol: number, fromRow: number, toCol: number, toRow: number): Direction {
   const dc = toCol - fromCol
   const dr = toRow - fromRow
@@ -98,13 +98,13 @@ export function updateCharacter(
         ch.frameTimer -= TYPE_FRAME_DURATION_SEC
         ch.frame = (ch.frame + 1) % 2
       }
-      // If no longer active, stand up and start wandering (after seatTimer expires)
+      // 若不再活躍，站起來開始漫遊（seatTimer 到期後）
       if (!ch.isActive) {
         if (ch.seatTimer > 0) {
           ch.seatTimer -= dt
           break
         }
-        ch.seatTimer = 0 // clear sentinel
+        ch.seatTimer = 0 // 清除哨兵值
         ch.state = CharacterState.IDLE
         ch.frame = 0
         ch.frameTimer = 0
@@ -116,13 +116,13 @@ export function updateCharacter(
     }
 
     case CharacterState.IDLE: {
-      // No idle animation — static pose
+      // 無閒置動畫 — 靜態姿勢
       ch.frame = 0
-      if (ch.seatTimer < 0) ch.seatTimer = 0 // clear turn-end sentinel
-      // If became active, pathfind to seat
+      if (ch.seatTimer < 0) ch.seatTimer = 0 // 清除回合結束哨兵值
+      // 若變為活躍，尋路至座位
       if (ch.isActive) {
         if (!ch.seatId) {
-          // No seat assigned — type in place
+          // 未分配座位 — 原地打字
           ch.state = CharacterState.TYPE
           ch.frame = 0
           ch.frameTimer = 0
@@ -138,7 +138,7 @@ export function updateCharacter(
             ch.frame = 0
             ch.frameTimer = 0
           } else {
-            // Already at seat or no path — sit down
+            // 已在座位上或無路徑 — 坐下
             ch.state = CharacterState.TYPE
             ch.dir = seat.facingDir
             ch.frame = 0
@@ -147,10 +147,10 @@ export function updateCharacter(
         }
         break
       }
-      // Countdown wander timer
+      // 漫遊計時器倒數
       ch.wanderTimer -= dt
       if (ch.wanderTimer <= 0) {
-        // Check if we've wandered enough — return to seat for a rest
+        // 檢查是否已漫遊足夠 — 返回座位休息
         if (ch.wanderCount >= ch.wanderLimit && ch.seatId) {
           const seat = seats.get(ch.seatId)
           if (seat) {
@@ -183,21 +183,21 @@ export function updateCharacter(
     }
 
     case CharacterState.WALK: {
-      // Walk animation
+      // 步行動畫
       if (ch.frameTimer >= WALK_FRAME_DURATION_SEC) {
         ch.frameTimer -= WALK_FRAME_DURATION_SEC
         ch.frame = (ch.frame + 1) % 4
       }
 
       if (ch.path.length === 0) {
-        // Path complete — snap to tile center and transition
+        // 路徑完成 — 對齊至格中心並轉換狀態
         const center = tileCenter(ch.tileCol, ch.tileRow)
         ch.x = center.x
         ch.y = center.y
 
         if (ch.isActive) {
           if (!ch.seatId) {
-            // No seat — type in place
+            // 沒有座位 — 原地打字
             ch.state = CharacterState.TYPE
           } else {
             const seat = seats.get(ch.seatId)
@@ -209,14 +209,14 @@ export function updateCharacter(
             }
           }
         } else {
-          // Check if arrived at assigned seat — sit down for a rest before wandering again
+          // 檢查是否抵達分配的座位 — 坐下休息後再繼續漫遊
           if (ch.seatId) {
             const seat = seats.get(ch.seatId)
             if (seat && ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
               ch.state = CharacterState.TYPE
               ch.dir = seat.facingDir
-              // seatTimer < 0 is a sentinel from setAgentActive(false) meaning
-              // "turn just ended" — skip the long rest so idle transition is immediate
+              // seatTimer < 0 是來自 setAgentActive(false) 的哨兵值，表示
+              // 「回合剛結束」— 跳過長時間休息讓閒置轉換立即發生
               if (ch.seatTimer < 0) {
                 ch.seatTimer = 0
               } else {
@@ -237,7 +237,7 @@ export function updateCharacter(
         break
       }
 
-      // Move toward next tile in path
+      // 朝路徑中的下一格移動
       const nextTile = ch.path[0]
       ch.dir = directionBetween(ch.tileCol, ch.tileRow, nextTile.col, nextTile.row)
 
@@ -250,7 +250,7 @@ export function updateCharacter(
       ch.y = fromCenter.y + (toCenter.y - fromCenter.y) * t
 
       if (ch.moveProgress >= 1) {
-        // Arrived at next tile
+        // 抵達下一格
         ch.tileCol = nextTile.col
         ch.tileRow = nextTile.row
         ch.x = toCenter.x
@@ -259,7 +259,7 @@ export function updateCharacter(
         ch.moveProgress = 0
       }
 
-      // If became active while wandering, repath to seat
+      // 若在漫遊期間變為活躍，重新尋路至座位
       if (ch.isActive && ch.seatId) {
         const seat = seats.get(ch.seatId)
         if (seat) {
@@ -278,7 +278,7 @@ export function updateCharacter(
   }
 }
 
-/** Get the correct sprite frame for a character's current state and direction */
+/** 取得角色當前狀態和方向對應的精靈圖幀 */
 export function getCharacterSprite(ch: Character, sprites: CharacterSprites): SpriteData {
   switch (ch.state) {
     case CharacterState.TYPE:

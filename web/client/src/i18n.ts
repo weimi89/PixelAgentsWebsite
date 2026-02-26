@@ -1,31 +1,31 @@
-// Centralized UI strings — Traditional Chinese localization
+// 集中管理的 UI 字串 — 繁體中文本地化
 export const t = {
-  // Bottom Toolbar
+  // 底部工具列
   addAgent: '+ 代理',
   layout: '佈局',
   editOfficeLayout: '編輯辦公室佈局',
   settings: '設定',
 
-  // Zoom Controls
+  // 縮放控制
   zoomIn: '放大 (Ctrl+滾輪)',
   zoomOut: '縮小 (Ctrl+滾輪)',
 
-  // Settings Modal
+  // 設定面板
   exportLayout: '匯出佈局',
   importLayout: '匯入佈局',
   soundNotifications: '音效通知',
   debugView: '除錯檢視',
 
-  // Agent
+  // 代理
   agent: (id: number) => `代理 #${id}`,
   closeAgent: '關閉代理',
 
-  // Status
+  // 狀態
   needsApproval: '需要核准',
   idle: '閒置中',
   mightBeWaiting: '可能正在等待輸入',
 
-  // Editor Toolbar
+  // 編輯器工具列
   floor: '地板',
   paintFloorTiles: '繪製地板磚塊',
   wall: '牆壁',
@@ -46,7 +46,7 @@ export const t = {
   colorize: '著色',
   floorPattern: (index: number) => `地板 ${index}`,
 
-  // Edit Action Bar
+  // 編輯動作列
   undo: '復原',
   undoShortcut: '復原 (Ctrl+Z)',
   redo: '重做',
@@ -59,23 +59,23 @@ export const t = {
   yes: '是',
   no: '否',
 
-  // Error Boundary
+  // 錯誤邊界
   errorOccurred: '發生錯誤',
   retry: '重試',
 
-  // Loading
+  // 載入中
   loading: '載入中...',
 
-  // Hints
+  // 提示
   pressRToRotate: '按 <b>R</b> 旋轉',
 
-  // Model
+  // 模型
   unknownModel: '未知模型',
 
-  // Detached (tmux)
+  // 已斷線 (tmux)
   detached: '已斷線',
 
-  // Session Picker
+  // 工作階段選擇器
   sessions: '工作階段',
   browseSessions: '瀏覽過去的工作階段',
   noSessions: '沒有找到工作階段',

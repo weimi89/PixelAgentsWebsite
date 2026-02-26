@@ -4,7 +4,7 @@ import type { TileType as TileTypeVal, OfficeLayout, PlacedFurniture, FloorColor
 import { getCatalogEntry, getRotatedType, getToggledType } from '../layout/furnitureCatalog.js'
 import { getPlacementBlockedTiles } from '../layout/layoutSerializer.js'
 
-/** Paint a single tile with pattern and color. Returns new layout (immutable). */
+/** 以花紋和色彩繪製單一磚塊。返回新佈局（不可變）。 */
 export function paintTile(layout: OfficeLayout, col: number, row: number, tileType: TileTypeVal, color?: FloorColor): OfficeLayout {
   const idx = row * layout.cols + col
   if (idx < 0 || idx >= layout.tiles.length) return layout
@@ -12,7 +12,7 @@ export function paintTile(layout: OfficeLayout, col: number, row: number, tileTy
   const existingColors = layout.tileColors || new Array(layout.tiles.length).fill(null)
   const newColor = color ?? (tileType === TileType.WALL || tileType === TileType.VOID ? null : { ...DEFAULT_NEUTRAL_COLOR })
 
-  // Check if anything actually changed
+  // 檢查是否有實際變更
   if (layout.tiles[idx] === tileType) {
     const existingColor = existingColors[idx]
     if (newColor === null && existingColor === null) return layout
@@ -29,20 +29,20 @@ export function paintTile(layout: OfficeLayout, col: number, row: number, tileTy
   return { ...layout, tiles, tileColors }
 }
 
-/** Place furniture. Returns new layout (immutable). */
+/** 放置家具。返回新佈局（不可變）。 */
 export function placeFurniture(layout: OfficeLayout, item: PlacedFurniture): OfficeLayout {
   if (!canPlaceFurniture(layout, item.type, item.col, item.row)) return layout
   return { ...layout, furniture: [...layout.furniture, item] }
 }
 
-/** Remove furniture by uid. Returns new layout (immutable). */
+/** 依 uid 移除家具。返回新佈局（不可變）。 */
 export function removeFurniture(layout: OfficeLayout, uid: string): OfficeLayout {
   const filtered = layout.furniture.filter((f) => f.uid !== uid)
   if (filtered.length === layout.furniture.length) return layout
   return { ...layout, furniture: filtered }
 }
 
-/** Move furniture to new position. Returns new layout (immutable). */
+/** 將家具移動至新位置。返回新佈局（不可變）。 */
 export function moveFurniture(layout: OfficeLayout, uid: string, newCol: number, newRow: number): OfficeLayout {
   const item = layout.furniture.find((f) => f.uid === uid)
   if (!item) return layout
@@ -53,7 +53,7 @@ export function moveFurniture(layout: OfficeLayout, uid: string, newCol: number,
   }
 }
 
-/** Rotate furniture to the next orientation. Returns new layout (immutable). */
+/** 將家具旋轉至下一個朝向。返回新佈局（不可變）。 */
 export function rotateFurniture(layout: OfficeLayout, uid: string, direction: 'cw' | 'ccw'): OfficeLayout {
   const item = layout.furniture.find((f) => f.uid === uid)
   if (!item) return layout
@@ -65,7 +65,7 @@ export function rotateFurniture(layout: OfficeLayout, uid: string, direction: 'c
   }
 }
 
-/** Toggle furniture state (on/off). Returns new layout (immutable). */
+/** 切換家具狀態（開/關）。返回新佈局（不可變）。 */
 export function toggleFurnitureState(layout: OfficeLayout, uid: string): OfficeLayout {
   const item = layout.furniture.find((f) => f.uid === uid)
   if (!item) return layout
@@ -77,17 +77,17 @@ export function toggleFurnitureState(layout: OfficeLayout, uid: string): OfficeL
   }
 }
 
-/** For wall items, offset the row so the bottom row aligns with the hovered tile. */
+/** 對於牆面項目，偏移列位使底部列對齊懸停的磚塊。 */
 export function getWallPlacementRow(type: string, row: number): number {
   const entry = getCatalogEntry(type)
   if (!entry?.canPlaceOnWalls) return row
   return row - (entry.footprintH - 1)
 }
 
-/** Check if furniture can be placed at (col, row) without overlapping. */
+/** 檢查家具是否可放置在 (col, row) 而不重疊。 */
 export function canPlaceFurniture(
   layout: OfficeLayout,
-  type: string, // FurnitureType enum or asset ID
+  type: string, // FurnitureType 列舉或素材 ID
   col: number,
   row: number,
   excludeUid?: string,
@@ -95,7 +95,7 @@ export function canPlaceFurniture(
   const entry = getCatalogEntry(type)
   if (!entry) return false
 
-  // Check bounds — wall items may extend above the map (top rows hang above the wall)
+  // 檢查邊界 — 牆面項目可能延伸至地圖上方（頂部列懸掛在牆上方）
   if (entry.canPlaceOnWalls) {
     const bottomRow = row + entry.footprintH - 1
     if (col < 0 || col + entry.footprintW > layout.cols || bottomRow < 0 || bottomRow >= layout.rows) {
@@ -107,12 +107,12 @@ export function canPlaceFurniture(
     }
   }
 
-  // Wall/VOID placement check (background rows skip this check)
+  // 牆壁/VOID 放置檢查（背景列跳過此檢查）
   const bgRows = entry.backgroundTiles || 0
   for (let dr = 0; dr < entry.footprintH; dr++) {
     if (dr < bgRows) continue
-    if (row + dr < 0) continue // row above map (wall items extending upward)
-    // Wall items: only the bottom row must be on wall tiles; upper rows can overlap VOID/anything
+    if (row + dr < 0) continue // 地圖上方的列（牆面項目向上延伸）
+    // 牆面項目：僅底部列必須在牆磚上；上方列可與 VOID/任何磚塊重疊
     if (entry.canPlaceOnWalls && dr < entry.footprintH - 1) continue
     for (let dc = 0; dc < entry.footprintW; dc++) {
       const idx = (row + dr) * layout.cols + (col + dc)
@@ -120,16 +120,16 @@ export function canPlaceFurniture(
       if (entry.canPlaceOnWalls) {
         if (tileVal !== TileType.WALL) return false
       } else {
-        if (tileVal === TileType.VOID) return false // Cannot place on VOID
-        if (tileVal === TileType.WALL) return false // Normal items cannot overlap walls
+        if (tileVal === TileType.VOID) return false // 不能放在 VOID 上
+        if (tileVal === TileType.WALL) return false // 一般項目不能與牆壁重疊
       }
     }
   }
 
-  // Build occupied set excluding the item being moved, skipping background tile rows
+  // 建構已佔據集合，排除正在移動的項目，跳過背景磚塊列
   const occupied = getPlacementBlockedTiles(layout.furniture, excludeUid)
 
-  // If this item can be placed on surfaces, build set of desk tiles to exclude from collision
+  // 若此項目可放在表面上，建構書桌磚塊集合以排除碰撞檢測
   let deskTiles: Set<string> | null = null
   if (entry.canPlaceOnSurfaces) {
     deskTiles = new Set<string>()
@@ -145,11 +145,11 @@ export function canPlaceFurniture(
     }
   }
 
-  // Check overlap — also skip the NEW item's own background rows
+  // 檢查重疊 — 也跳過新項目自身的背景列
   const newBgRows = entry.backgroundTiles || 0
   for (let dr = 0; dr < entry.footprintH; dr++) {
-    if (dr < newBgRows) continue // new item's background rows can overlap existing items
-    if (row + dr < 0) continue // row above map (wall items extending upward)
+    if (dr < newBgRows) continue // 新項目的背景列可與現有項目重疊
+    if (row + dr < 0) continue // 地圖上方的列（牆面項目向上延伸）
     for (let dc = 0; dc < entry.footprintW; dc++) {
       const key = `${col + dc},${row + dr}`
       if (occupied.has(key) && !(deskTiles?.has(key))) return false
@@ -162,9 +162,9 @@ export function canPlaceFurniture(
 export type ExpandDirection = 'left' | 'right' | 'up' | 'down'
 
 /**
- * Expand layout by 1 tile in the given direction. New tiles are VOID.
- * Furniture and tile indices are shifted when expanding left or up.
- * Returns { layout, shift } or null if exceeding MAX_COLS/MAX_ROWS.
+ * 向指定方向擴展佈局 1 格。新磚塊為 VOID。
+ * 向左或向上擴展時，家具和磚塊索引會偏移。
+ * 返回 { layout, shift }，若超過 MAX_COLS/MAX_ROWS 則返回 null。
  */
 export function expandLayout(
   layout: OfficeLayout,
@@ -192,7 +192,7 @@ export function expandLayout(
 
   if (newCols > MAX_COLS || newRows > MAX_ROWS) return null
 
-  // Build new tile array
+  // 建構新磚塊陣列
   const newTiles: TileTypeVal[] = new Array(newCols * newRows).fill(TileType.VOID as TileTypeVal)
   const newColors: Array<FloorColor | null> = new Array(newCols * newRows).fill(null)
 
@@ -205,7 +205,7 @@ export function expandLayout(
     }
   }
 
-  // Shift furniture positions
+  // 偏移家具位置
   const newFurniture: PlacedFurniture[] = furniture.map((f) => ({
     ...f,
     col: f.col + shiftCol,

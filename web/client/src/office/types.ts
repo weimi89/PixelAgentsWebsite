@@ -20,17 +20,17 @@ export const TileType = {
 } as const
 export type TileType = (typeof TileType)[keyof typeof TileType]
 
-/** Per-tile color settings for floor pattern colorization */
+/** 每格磚塊的色彩設定，用於地板花紋著色 */
 export interface FloorColor {
-  /** Hue: 0-360 in colorize mode, -180 to +180 in adjust mode */
+  /** 色相：colorize 模式 0-360，adjust 模式 -180 到 +180 */
   h: number
-  /** Saturation: 0-100 in colorize mode, -100 to +100 in adjust mode */
+  /** 飽和度：colorize 模式 0-100，adjust 模式 -100 到 +100 */
   s: number
-  /** Brightness -100 to 100 */
+  /** 亮度 -100 到 100 */
   b: number
-  /** Contrast -100 to 100 */
+  /** 對比度 -100 到 100 */
   c: number
-  /** When true, use Photoshop-style Colorize (grayscale → fixed HSL). Default: adjust mode. */
+  /** 為 true 時使用 Photoshop 風格 Colorize（灰階 → 固定 HSL）。預設：adjust 模式。 */
   colorize?: boolean
 }
 
@@ -49,28 +49,28 @@ export const Direction = {
 } as const
 export type Direction = (typeof Direction)[keyof typeof Direction]
 
-/** 2D array of hex color strings (or '' for transparent). [row][col] */
+/** hex 色彩字串的二維陣列（'' 表示透明）。[列][欄] */
 export type SpriteData = string[][]
 
 export interface Seat {
-  /** Chair furniture uid */
+  /** 椅子家具 uid */
   uid: string
-  /** Tile col where agent sits */
+  /** 代理坐下的磚塊欄位 */
   seatCol: number
-  /** Tile row where agent sits */
+  /** 代理坐下的磚塊列位 */
   seatRow: number
-  /** Direction character faces when sitting (toward adjacent desk) */
+  /** 角色坐下時面對的方向（朝向相鄰書桌） */
   facingDir: Direction
   assigned: boolean
 }
 
 export interface FurnitureInstance {
   sprite: SpriteData
-  /** Pixel x (top-left) */
+  /** 像素 x（左上角） */
   x: number
-  /** Pixel y (top-left) */
+  /** 像素 y（左上角） */
   y: number
-  /** Y value used for depth sorting (typically bottom edge) */
+  /** 用於深度排序的 Y 值（通常為底部邊緣） */
   zY: number
 }
 
@@ -82,7 +82,7 @@ export interface ToolActivity {
 }
 
 export const FurnitureType = {
-  // Original hand-drawn sprites (kept for backward compat)
+  // 原始手繪精靈圖（保留以向後相容）
   DESK: 'desk',
   BOOKSHELF: 'bookshelf',
   PLANT: 'plant',
@@ -91,7 +91,7 @@ export const FurnitureType = {
   CHAIR: 'chair',
   PC: 'pc',
   LAMP: 'lamp',
-  // New furniture sprites
+  // 新家具精靈圖
   LAPTOP: 'laptop',
   PRINTER: 'printer',
   COFFEE_MACHINE: 'coffee_machine',
@@ -104,7 +104,7 @@ export const FurnitureType = {
   VENDING_MACHINE: 'vending_machine',
   SERVER_RACK: 'server_rack',
   WINDOW: 'window',
-  // Batch 2 furniture sprites
+  // 第二批家具精靈圖
   MEETING_TABLE: 'meeting_table',
   COFFEE_TABLE: 'coffee_table',
   ARMCHAIR: 'armchair',
@@ -136,29 +136,29 @@ export const EditTool = {
 export type EditTool = (typeof EditTool)[keyof typeof EditTool]
 
 export interface FurnitureCatalogEntry {
-  type: string // FurnitureType enum or asset ID
+  type: string // FurnitureType 列舉或素材 ID
   label: string
   footprintW: number
   footprintH: number
   sprite: SpriteData
   isDesk: boolean
   category?: string
-  /** Orientation from rotation group: 'front' | 'back' | 'left' | 'right' */
+  /** 旋轉群組的朝向：'front' | 'back' | 'left' | 'right' */
   orientation?: string
-  /** Whether this item can be placed on top of desk/table surfaces */
+  /** 此項目是否可放置在書桌/桌面表面上 */
   canPlaceOnSurfaces?: boolean
-  /** Number of tile rows from the top of the footprint that are "background" (allow placement, still block walking). Default 0. */
+  /** 從佔地頂部算起屬於「背景」的磚塊列數（允許放置，仍封鎖行走）。預設 0。 */
   backgroundTiles?: number
-  /** Whether this item can be placed on wall tiles */
+  /** 此項目是否可放置在牆磚上 */
   canPlaceOnWalls?: boolean
 }
 
 export interface PlacedFurniture {
   uid: string
-  type: string // FurnitureType enum or asset ID
+  type: string // FurnitureType 列舉或素材 ID
   col: number
   row: number
-  /** Optional color override for furniture */
+  /** 家具的選用色彩覆寫 */
   color?: FloorColor
 }
 
@@ -168,7 +168,7 @@ export interface OfficeLayout {
   rows: number
   tiles: TileType[]
   furniture: PlacedFurniture[]
-  /** Per-tile color settings, parallel to tiles array. null = wall/no color */
+  /** 每格磚塊的色彩設定，與 tiles 陣列平行。null = 牆壁/無色彩 */
   tileColors?: Array<FloorColor | null>
 }
 
@@ -176,53 +176,53 @@ export interface Character {
   id: number
   state: CharacterState
   dir: Direction
-  /** Pixel position */
+  /** 像素位置 */
   x: number
   y: number
-  /** Current tile column */
+  /** 當前磚塊欄位 */
   tileCol: number
-  /** Current tile row */
+  /** 當前磚塊列位 */
   tileRow: number
-  /** Remaining path steps (tile coords) */
+  /** 剩餘路徑步驟（磚塊座標） */
   path: Array<{ col: number; row: number }>
-  /** 0-1 lerp between current tile and next tile */
+  /** 當前磚塊與下一磚塊之間的 0-1 插值 */
   moveProgress: number
-  /** Current tool name for typing vs reading animation, or null */
+  /** 當前工具名稱，用於打字 vs 閱讀動畫選擇，或 null */
   currentTool: string | null
-  /** Palette index (0-5) */
+  /** 調色盤索引（0-5） */
   palette: number
-  /** Hue shift in degrees (0 = no shift, ≥45 for repeated palettes) */
+  /** 色相偏移角度（0 = 無偏移，重複調色盤時 ≥45） */
   hueShift: number
-  /** Animation frame index */
+  /** 動畫幀索引 */
   frame: number
-  /** Time accumulator for animation */
+  /** 動畫用時間累加器 */
   frameTimer: number
-  /** Timer for idle wander decisions */
+  /** 閒置漫遊決策計時器 */
   wanderTimer: number
-  /** Number of wander moves completed in current roaming cycle */
+  /** 當前漫遊週期中已完成的漫遊移動次數 */
   wanderCount: number
-  /** Max wander moves before returning to seat for rest */
+  /** 返回座位休息前的最大漫遊移動次數 */
   wanderLimit: number
-  /** Whether the agent is actively working */
+  /** 代理是否正在積極工作 */
   isActive: boolean
-  /** Assigned seat uid, or null if no seat */
+  /** 已指定的座位 uid，若無座位則為 null */
   seatId: string | null
-  /** Whether this character is detached (tmux session alive but server restarted) */
+  /** 此角色是否已分離（tmux session 存活但伺服器已重啟） */
   isDetached: boolean
-  /** Active speech bubble type, or null if none showing */
+  /** 當前顯示的對話氣泡類型，若無顯示則為 null */
   bubbleType: 'permission' | 'waiting' | 'detached' | null
-  /** Countdown timer for bubble (waiting: 2→0, permission: unused) */
+  /** 氣泡倒數計時器（waiting: 2→0, permission: 未使用） */
   bubbleTimer: number
-  /** Timer to stay seated while inactive after seat reassignment (counts down to 0) */
+  /** 座位重新指定後，非活躍狀態下保持坐姿的計時器（倒數至 0） */
   seatTimer: number
-  /** Whether this character represents a sub-agent (spawned by Task tool) */
+  /** 此角色是否代表子代理（由 Task 工具生成） */
   isSubagent: boolean
-  /** Parent agent ID if this is a sub-agent, null otherwise */
+  /** 若為子代理，則為父代理 ID，否則為 null */
   parentAgentId: number | null
-  /** Active matrix spawn/despawn effect, or null */
+  /** 當前活躍的 Matrix 生成/消散特效，或 null */
   matrixEffect: 'spawn' | 'despawn' | null
-  /** Timer counting up from 0 to MATRIX_EFFECT_DURATION */
+  /** 從 0 向上計數至 MATRIX_EFFECT_DURATION 的計時器 */
   matrixEffectTimer: number
-  /** Per-column random seeds (16 values) for staggered rain timing */
+  /** 每欄的隨機種子（16 個值），用於交錯雨滴時序 */
   matrixEffectSeeds: number[]
 }

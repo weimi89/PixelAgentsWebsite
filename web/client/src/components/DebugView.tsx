@@ -11,7 +11,7 @@ interface DebugViewProps {
   onSelectAgent: (id: number) => void
 }
 
-/** Z-index just below the floating toolbar (50) so the toolbar stays on top */
+/** Z-index 剛好在浮動工具列 (50) 之下，使工具列保持在最上層 */
 const DEBUG_Z = 40
 
 function ToolDot({ tool }: { tool: ToolActivity }) {
@@ -170,7 +170,7 @@ export function DebugView({
         overflow: 'auto',
       }}
     >
-      {/* Top padding so cards don't overlap the floating toolbar */}
+      {/* 頂部間距，避免卡片與浮動工具列重疊 */}
       <div style={{ padding: '12px 12px 12px', fontSize: '28px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {agents.map(renderAgentCard)}

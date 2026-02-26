@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 
 /**
- * Shared requestAnimationFrame loop for React overlay components.
- * Multiple components using this hook share a single rAF callback,
- * reducing overhead compared to each running its own independent loop.
+ * 共享的 requestAnimationFrame 迴圈，供 React 覆蓋層元件使用。
+ * 使用此 hook 的多個元件共享同一個 rAF 回呼，
+ * 相比各自執行獨立迴圈，可減少開銷。
  */
 const callbacks = new Set<() => void>()
 let rafId = 0

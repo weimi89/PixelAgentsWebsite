@@ -6,7 +6,7 @@ import { TOOL_OVERLAY_VERTICAL_OFFSET, CHARACTER_SITTING_OFFSET_PX } from '../..
 import { t } from '../../i18n.js'
 import { useRenderTick } from '../../hooks/useRenderTick.js'
 
-/** Format raw model ID to short display name, e.g. "claude-opus-4-6" → "Opus" */
+/** 將原始 model ID 格式化為簡短的顯示名稱，例如 "claude-opus-4-6" → "Opus" */
 function formatModelName(model: string): string {
   const m = model.match(/^claude-(\w+)/)
   if (m) {
@@ -27,7 +27,7 @@ interface ToolOverlayProps {
   onCloseAgent: (id: number) => void
 }
 
-/** Derive a short human-readable activity string from tools/status */
+/** 從工具/狀態衍生出簡短的人類可讀活動字串 */
 function getActivityText(
   agentId: number,
   agentTools: Record<number, ToolActivity[]>,
@@ -35,13 +35,13 @@ function getActivityText(
 ): string {
   const tools = agentTools[agentId]
   if (tools && tools.length > 0) {
-    // Find the latest non-done tool
+    // 找到最新的未完成工具
     const activeTool = [...tools].reverse().find((t) => !t.done)
     if (activeTool) {
       if (activeTool.permissionWait) return t.needsApproval
       return activeTool.status
     }
-    // All tools done but agent still active (mid-turn) — keep showing last tool status
+    // 所有工具已完成但代理仍活躍（回合中）— 繼續顯示最後的工具狀態
     if (isActive) {
       const lastTool = tools[tools.length - 1]
       if (lastTool) return lastTool.status
@@ -79,7 +79,7 @@ export function ToolOverlay({
   const selectedId = officeState.selectedAgentId
   const hoveredId = officeState.hoveredAgentId
 
-  // All character IDs
+  // 所有角色 ID
   const allIds = [...agents, ...subagentCharacters.map((s) => s.id)]
 
   return (
@@ -92,15 +92,15 @@ export function ToolOverlay({
         const isHovered = hoveredId === id
         const isSub = ch.isSubagent
 
-        // Only show for hovered or selected agents
+        // 僅對懸停或選取的代理顯示
         if (!isSelected && !isHovered) return null
 
-        // Position above character
+        // 定位於角色上方
         const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0
         const screenX = (deviceOffsetX + ch.x * zoom) / dpr
         const screenY = (deviceOffsetY + (ch.y + sittingOffset - TOOL_OVERLAY_VERTICAL_OFFSET) * zoom) / dpr
 
-        // Get activity text
+        // 取得活動文字
         const subHasPermission = isSub && ch.bubbleType === 'permission'
         const isDetached = ch.isDetached
         let activityText: string
@@ -117,10 +117,10 @@ export function ToolOverlay({
           activityText = getActivityText(id, agentTools, ch.isActive)
         }
 
-        // Get model display name
+        // 取得模型顯示名稱
         const modelName = !isSub && agentModels[id] ? formatModelName(agentModels[id]) : null
 
-        // Determine dot color
+        // 決定圓點顏色
         const tools = agentTools[id]
         const hasPermission = subHasPermission || tools?.some((t) => t.permissionWait && !t.done)
         const hasActiveTools = tools?.some((t) => !t.done)

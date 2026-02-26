@@ -55,7 +55,7 @@ export function processTranscriptLine(
 		const record = JSON.parse(line);
 
 		if (record.type === 'assistant' && Array.isArray(record.message?.content)) {
-			// Extract model name from assistant records
+			// 從助手記錄中提取模型名稱
 			const model = record.message?.model as string | undefined;
 			if (model && agent.model !== model) {
 				agent.model = model;
@@ -168,7 +168,7 @@ export function processTranscriptLine(
 			});
 		}
 	} catch {
-		// Ignore malformed lines
+		// 忽略格式錯誤的行
 	}
 }
 

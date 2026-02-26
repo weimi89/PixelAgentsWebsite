@@ -41,7 +41,7 @@ import {
   DETACHED_CHARACTER_ALPHA,
 } from '../../constants.js'
 
-// ── Render functions ────────────────────────────────────────────
+// ── 渲染函式 ────────────────────────────────────────────
 
 export function renderTileGrid(
   ctx: CanvasRenderingContext2D,
@@ -58,16 +58,16 @@ export function renderTileGrid(
   const tmCols = tmRows > 0 ? tileMap[0].length : 0
   const layoutCols = cols ?? tmCols
 
-  // Floor tiles + wall base color
+  // 地板磚 + 牆壁底色
   for (let r = 0; r < tmRows; r++) {
     for (let c = 0; c < tmCols; c++) {
       const tile = tileMap[r][c]
 
-      // Skip VOID tiles entirely (transparent)
+      // 完全跳過 VOID 格（透明）
       if (tile === TileType.VOID) continue
 
       if (tile === TileType.WALL || !useSpriteFloors) {
-        // Wall tiles or fallback: solid color
+        // 牆磚或備選：純色填充
         if (tile === TileType.WALL) {
           const colorIdx = r * layoutCols + c
           const wallColor = tileColors?.[colorIdx]
@@ -79,7 +79,7 @@ export function renderTileGrid(
         continue
       }
 
-      // Floor tile: get colorized sprite
+      // 地板磚：取得著色後的精靈圖
       const colorIdx = r * layoutCols + c
       const color = tileColors?.[colorIdx] ?? { h: 0, s: 0, b: 0, c: 0 }
       const sprite = getColorizedFloorSprite(tile, color)
@@ -107,7 +107,7 @@ export function renderScene(
 ): void {
   const drawables: ZDrawable[] = []
 
-  // Furniture
+  // 家具
   for (const f of furniture) {
     const cached = getCachedSprite(f.sprite, zoom)
     const fx = offsetX + f.x * zoom
@@ -120,23 +120,23 @@ export function renderScene(
     })
   }
 
-  // Characters
+  // 角色
   for (const ch of characters) {
     const sprites = getCharacterSprites(ch.palette, ch.hueShift)
     const spriteData = getCharacterSprite(ch, sprites)
     const cached = getCachedSprite(spriteData, zoom)
-    // Sitting offset: shift character down when seated so they visually sit in the chair
+    // 坐姿偏移：角色坐下時向下移動，使其視覺上坐在椅子上
     const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0
-    // Anchor at bottom-center of character — round to integer device pixels
+    // 錨點在角色底部中央 — 四捨五入為整數裝置像素
     const drawX = Math.round(offsetX + ch.x * zoom - cached.width / 2)
     const drawY = Math.round(offsetY + (ch.y + sittingOffset) * zoom - cached.height)
 
-    // Sort characters by bottom of their tile (not center) so they render
-    // in front of same-row furniture (e.g. chairs) but behind furniture
-    // at lower rows (e.g. desks, bookshelves that occlude from below).
+    // 按角色格底部排序（非中心）使其渲染在
+    // 同行家具（如椅子）前方，但在較低行家具
+    //（如書桌、書架等從下方遮擋的物件）後方。
     const charZY = ch.y + TILE_SIZE / 2 + CHARACTER_Z_SORT_OFFSET
 
-    // Matrix spawn/despawn effect — skip outline, use per-pixel rendering
+    // Matrix 生成/消散特效 — 跳過輪廓，使用逐像素渲染
     if (ch.matrixEffect) {
       const mDrawX = drawX
       const mDrawY = drawY
@@ -151,17 +151,17 @@ export function renderScene(
       continue
     }
 
-    // White outline: full opacity for selected, 50% for hover
+    // 白色輪廓：選取時完全不透明，懸停時 50%
     const isSelected = selectedAgentId !== null && ch.id === selectedAgentId
     const isHovered = hoveredAgentId !== null && ch.id === hoveredAgentId
     if (isSelected || isHovered) {
       const outlineAlpha = isSelected ? SELECTED_OUTLINE_ALPHA : HOVERED_OUTLINE_ALPHA
       const outlineData = getOutlineSprite(spriteData)
       const outlineCached = getCachedSprite(outlineData, zoom)
-      const olDrawX = drawX - zoom  // 1 sprite-pixel offset, scaled
-      const olDrawY = drawY - zoom  // outline follows sitting offset via drawY
+      const olDrawX = drawX - zoom  // 1 個精靈像素偏移，已縮放
+      const olDrawY = drawY - zoom  // 輪廓透過 drawY 跟隨坐姿偏移
       drawables.push({
-        zY: charZY - OUTLINE_Z_SORT_OFFSET, // sort just before character
+        zY: charZY - OUTLINE_Z_SORT_OFFSET, // 排序在角色之前
         draw: (c) => {
           c.save()
           c.globalAlpha = outlineAlpha
@@ -171,7 +171,7 @@ export function renderScene(
       })
     }
 
-    // Detached characters render at reduced opacity
+    // 斷線角色以降低的不透明度渲染
     const isDetached = ch.isDetached
     drawables.push({
       zY: charZY,
@@ -188,7 +188,7 @@ export function renderScene(
     })
   }
 
-  // Sort by Y (lower = in front = drawn later)
+  // 按 Y 排序（越低 = 越前方 = 越晚繪製）
   drawables.sort((a, b) => a.zY - b.zY)
 
   for (const d of drawables) {
@@ -196,7 +196,7 @@ export function renderScene(
   }
 }
 
-// ── Seat indicators ─────────────────────────────────────────────
+// ── 座位指示器 ─────────────────────────────────────────────
 
 export function renderSeatIndicators(
   ctx: CanvasRenderingContext2D,
@@ -212,7 +212,7 @@ export function renderSeatIndicators(
   const selectedChar = characters.get(selectedAgentId)
   if (!selectedChar) return
 
-  // Only show indicator for the hovered seat tile
+  // 僅顯示懸停座位格的指示器
   for (const [uid, seat] of seats) {
     if (seat.seatCol !== hoveredTile.col || seat.seatRow !== hoveredTile.row) continue
 
@@ -221,13 +221,13 @@ export function renderSeatIndicators(
     const y = offsetY + seat.seatRow * s
 
     if (selectedChar.seatId === uid) {
-      // Selected agent's own seat — blue
+      // 選取代理的自身座位 — 藍色
       ctx.fillStyle = SEAT_OWN_COLOR
     } else if (!seat.assigned) {
-      // Available seat — green
+      // 可用座位 — 綠色
       ctx.fillStyle = SEAT_AVAILABLE_COLOR
     } else {
-      // Busy (assigned to another agent) — red
+      // 已佔用（分配給其他代理）— 紅色
       ctx.fillStyle = SEAT_BUSY_COLOR
     }
     ctx.fillRect(x, y, s, s)
@@ -235,7 +235,7 @@ export function renderSeatIndicators(
   }
 }
 
-// ── Edit mode overlays ──────────────────────────────────────────
+// ── 編輯模式覆蓋層 ──────────────────────────────────────────
 
 export function renderGridOverlay(
   ctx: CanvasRenderingContext2D,
@@ -250,13 +250,13 @@ export function renderGridOverlay(
   ctx.strokeStyle = GRID_LINE_COLOR
   ctx.lineWidth = 1
   ctx.beginPath()
-  // Vertical lines — offset by 0.5 for crisp 1px lines
+  // 垂直線 — 偏移 0.5 以獲得清晰的 1px 線條
   for (let c = 0; c <= cols; c++) {
     const x = offsetX + c * s + 0.5
     ctx.moveTo(x, offsetY)
     ctx.lineTo(x, offsetY + rows * s)
   }
-  // Horizontal lines
+  // 水平線
   for (let r = 0; r <= rows; r++) {
     const y = offsetY + r * s + 0.5
     ctx.moveTo(offsetX, y)
@@ -264,7 +264,7 @@ export function renderGridOverlay(
   }
   ctx.stroke()
 
-  // Draw faint dashed outlines on VOID tiles
+  // 在 VOID 格上繪製淡虛線輪廓
   if (tileMap) {
     ctx.save()
     ctx.strokeStyle = VOID_TILE_OUTLINE_COLOR
@@ -281,7 +281,7 @@ export function renderGridOverlay(
   }
 }
 
-/** Draw faint expansion placeholders 1 tile outside grid bounds (ghost border). */
+/** 在網格邊界外 1 格繪製淡擴展佔位符（幽靈邊框）。 */
 export function renderGhostBorder(
   ctx: CanvasRenderingContext2D,
   offsetX: number,
@@ -295,14 +295,14 @@ export function renderGhostBorder(
   const s = TILE_SIZE * zoom
   ctx.save()
 
-  // Collect ghost border tiles: one ring around the grid
+  // 收集幽靈邊框格：網格周圍一圈
   const ghostTiles: Array<{ c: number; r: number }> = []
-  // Top and bottom rows
+  // 頂部和底部行
   for (let c = -1; c <= cols; c++) {
     ghostTiles.push({ c, r: -1 })
     ghostTiles.push({ c, r: rows })
   }
-  // Left and right columns (excluding corners already added)
+  // 左側和右側欄（排除已加入的角落）
   for (let r = 0; r < rows; r++) {
     ghostTiles.push({ c: -1, r })
     ghostTiles.push({ c: cols, r })
@@ -341,7 +341,7 @@ export function renderGhostPreview(
   ctx.save()
   ctx.globalAlpha = GHOST_PREVIEW_SPRITE_ALPHA
   ctx.drawImage(cached, x, y)
-  // Tint overlay
+  // 色調覆蓋層
   ctx.globalAlpha = GHOST_PREVIEW_TINT_ALPHA
   ctx.fillStyle = valid ? GHOST_VALID_TINT : GHOST_INVALID_TINT
   ctx.fillRect(x, y, cached.width, cached.height)
@@ -380,19 +380,19 @@ export function renderDeleteButton(
   zoom: number,
 ): DeleteButtonBounds {
   const s = TILE_SIZE * zoom
-  // Position at top-right corner of selected furniture
+  // 定位在選取家具的右上角
   const cx = offsetX + (col + w) * s + 1
   const cy = offsetY + row * s - 1
   const radius = Math.max(BUTTON_MIN_RADIUS, zoom * BUTTON_RADIUS_ZOOM_FACTOR)
 
-  // Circle background
+  // 圓形背景
   ctx.save()
   ctx.beginPath()
   ctx.arc(cx, cy, radius, 0, Math.PI * 2)
   ctx.fillStyle = DELETE_BUTTON_BG
   ctx.fill()
 
-  // X mark
+  // X 標記
   ctx.strokeStyle = '#fff'
   ctx.lineWidth = Math.max(BUTTON_LINE_WIDTH_MIN, zoom * BUTTON_LINE_WIDTH_ZOOM_FACTOR)
   ctx.lineCap = 'round'
@@ -419,28 +419,28 @@ export function renderRotateButton(
   zoom: number,
 ): RotateButtonBounds {
   const s = TILE_SIZE * zoom
-  // Position to the left of the delete button (which is at top-right corner)
+  // 定位在刪除按鈕的左側（刪除按鈕在右上角）
   const radius = Math.max(BUTTON_MIN_RADIUS, zoom * BUTTON_RADIUS_ZOOM_FACTOR)
   const cx = offsetX + col * s - 1
   const cy = offsetY + row * s - 1
 
-  // Circle background
+  // 圓形背景
   ctx.save()
   ctx.beginPath()
   ctx.arc(cx, cy, radius, 0, Math.PI * 2)
   ctx.fillStyle = ROTATE_BUTTON_BG
   ctx.fill()
 
-  // Circular arrow icon
+  // 圓形箭頭圖示
   ctx.strokeStyle = '#fff'
   ctx.lineWidth = Math.max(BUTTON_LINE_WIDTH_MIN, zoom * BUTTON_LINE_WIDTH_ZOOM_FACTOR)
   ctx.lineCap = 'round'
   const arcR = radius * BUTTON_ICON_SIZE_FACTOR
   ctx.beginPath()
-  // Draw a 270-degree arc
+  // 繪製 270 度弧線
   ctx.arc(cx, cy, arcR, -Math.PI * 0.8, Math.PI * 0.7)
   ctx.stroke()
-  // Draw arrowhead at the end of the arc
+  // 在弧線末端繪製箭頭
   const endAngle = Math.PI * 0.7
   const endX = cx + arcR * Math.cos(endAngle)
   const endY = cy + arcR * Math.sin(endAngle)
@@ -455,7 +455,7 @@ export function renderRotateButton(
   return { cx, cy, radius }
 }
 
-// ── Speech bubbles ──────────────────────────────────────────────
+// ── 對話氣泡 ──────────────────────────────────────────────
 
 export function renderBubbles(
   ctx: CanvasRenderingContext2D,
@@ -473,16 +473,16 @@ export function renderBubbles(
         ? BUBBLE_DETACHED_SPRITE
         : BUBBLE_WAITING_SPRITE
 
-    // Compute opacity: permission = full, waiting = fade in last 0.5s
+    // 計算不透明度：權限 = 完全不透明，等待 = 最後 0.5s 淡出
     let alpha = 1.0
     if (ch.bubbleType === 'waiting' && ch.bubbleTimer < BUBBLE_FADE_DURATION_SEC) {
       alpha = ch.bubbleTimer / BUBBLE_FADE_DURATION_SEC
     }
 
     const cached = getCachedSprite(sprite, zoom)
-    // Position: centered above the character's head
-    // Character is anchored bottom-center at (ch.x, ch.y), sprite is 16x24
-    // Place bubble above head with a small gap; follow sitting offset
+    // 位置：置中於角色頭部上方
+    // 角色錨點在底部中央 (ch.x, ch.y)，精靈圖為 16x24
+    // 將氣泡放在頭部上方並留有小間距；跟隨坐姿偏移
     const sittingOff = ch.state === CharacterState.TYPE ? BUBBLE_SITTING_OFFSET_PX : 0
     const bubbleX = Math.round(offsetX + ch.x * zoom - cached.width / 2)
     const bubbleY = Math.round(offsetY + (ch.y + sittingOff - BUBBLE_VERTICAL_OFFSET_PX) * zoom - cached.height - 1 * zoom)
@@ -495,11 +495,11 @@ export function renderBubbles(
 }
 
 export interface ButtonBounds {
-  /** Center X in device pixels */
+  /** 裝置像素中的中心 X */
   cx: number
-  /** Center Y in device pixels */
+  /** 裝置像素中的中心 Y */
   cy: number
-  /** Radius in device pixels */
+  /** 裝置像素中的半徑 */
   radius: number
 }
 
@@ -518,15 +518,15 @@ export interface EditorRenderState {
   selectedH: number
   hasSelection: boolean
   isRotatable: boolean
-  /** Updated each frame by renderDeleteButton */
+  /** 每幀由 renderDeleteButton 更新 */
   deleteButtonBounds: DeleteButtonBounds | null
-  /** Updated each frame by renderRotateButton */
+  /** 每幀由 renderRotateButton 更新 */
   rotateButtonBounds: RotateButtonBounds | null
-  /** Whether to show ghost border (expansion tiles outside grid) */
+  /** 是否顯示幽靈邊框（網格外的擴展格） */
   showGhostBorder: boolean
-  /** Hovered ghost border tile col (-1 to cols) */
+  /** 懸停的幽靈邊框格欄（-1 到 cols） */
   ghostBorderHoverCol: number
-  /** Hovered ghost border tile row (-1 to rows) */
+  /** 懸停的幽靈邊框格行（-1 到 rows） */
   ghostBorderHoverRow: number
 }
 
@@ -554,28 +554,28 @@ export function renderFrame(
   layoutCols?: number,
   layoutRows?: number,
 ): { offsetX: number; offsetY: number } {
-  // Clear
+  // 清除
   ctx.clearRect(0, 0, canvasWidth, canvasHeight)
 
-  // Use layout dimensions (fallback to tileMap size)
+  // 使用佈局尺寸（備選為 tileMap 大小）
   const cols = layoutCols ?? (tileMap.length > 0 ? tileMap[0].length : 0)
   const rows = layoutRows ?? tileMap.length
 
-  // Center map in viewport + pan offset (integer device pixels)
+  // 在視窗中置中地圖 + 平移偏移（整數裝置像素）
   const mapW = cols * TILE_SIZE * zoom
   const mapH = rows * TILE_SIZE * zoom
   const offsetX = Math.floor((canvasWidth - mapW) / 2) + Math.round(panX)
   const offsetY = Math.floor((canvasHeight - mapH) / 2) + Math.round(panY)
 
-  // Draw tiles (floor + wall base color)
+  // 繪製磚塊（地板 + 牆壁底色）
   renderTileGrid(ctx, tileMap, offsetX, offsetY, zoom, tileColors, layoutCols)
 
-  // Seat indicators (below furniture/characters, on top of floor)
+  // 座位指示器（在家具/角色下方，在地板上方）
   if (selection) {
     renderSeatIndicators(ctx, selection.seats, selection.characters, selection.selectedAgentId, selection.hoveredTile, offsetX, offsetY, zoom)
   }
 
-  // Build wall instances for z-sorting with furniture and characters
+  // 建構牆壁實例以與家具和角色進行 Z-sort
   const wallInstances = hasWallSprites()
     ? getWallInstances(tileMap, tileColors, layoutCols)
     : []
@@ -583,15 +583,15 @@ export function renderFrame(
     ? [...wallInstances, ...furniture]
     : furniture
 
-  // Draw walls + furniture + characters (z-sorted)
+  // 繪製牆壁 + 家具 + 角色（Z-sort）
   const selectedId = selection?.selectedAgentId ?? null
   const hoveredId = selection?.hoveredAgentId ?? null
   renderScene(ctx, allFurniture, characters, offsetX, offsetY, zoom, selectedId, hoveredId)
 
-  // Speech bubbles (always on top of characters)
+  // 對話氣泡（始終在角色上方）
   renderBubbles(ctx, characters, offsetX, offsetY, zoom)
 
-  // Editor overlays
+  // 編輯器覆蓋層
   if (editor) {
     if (editor.showGrid) {
       renderGridOverlay(ctx, offsetX, offsetY, zoom, cols, rows, tileMap)

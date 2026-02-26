@@ -47,7 +47,7 @@ export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }
 
   return (
     <>
-      {/* Backdrop */}
+      {/* 背景遮罩 */}
       <div
         onClick={onClose}
         style={{
@@ -60,7 +60,7 @@ export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }
           zIndex: 49,
         }}
       />
-      {/* Modal */}
+      {/* 彈出視窗 */}
       <div
         style={{
           position: 'fixed',
@@ -79,7 +79,7 @@ export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }
           flexDirection: 'column',
         }}
       >
-        {/* Header */}
+        {/* 標題列 */}
         <div
           style={{
             display: 'flex',
@@ -113,7 +113,7 @@ export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }
           </button>
         </div>
 
-        {/* Session list */}
+        {/* 工作階段列表 */}
         <div
           style={{
             overflowY: 'auto',
@@ -151,7 +151,7 @@ export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }
                     }
                   }}
                 >
-                  {/* Top row: project name + time */}
+                  {/* 上列：專案名稱 + 時間 */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                     <span style={{
                       fontSize: '16px',
@@ -179,7 +179,7 @@ export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }
                       </span>
                     </span>
                   </div>
-                  {/* Bottom row: title + size */}
+                  {/* 下列：標題 + 大小 */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{
                       fontSize: '20px',

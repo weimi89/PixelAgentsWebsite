@@ -2,47 +2,47 @@ import type { Direction, SpriteData, FloorColor } from '../types.js'
 import { Direction as Dir } from '../types.js'
 import { adjustSprite } from '../colorize.js'
 
-// ── Color Palettes ──────────────────────────────────────────────
-const _ = '' // transparent
+// ── 色彩調色盤 ──────────────────────────────────────────────
+const _ = '' // 透明
 
-// ── Furniture Sprites ───────────────────────────────────────────
+// ── 家具精靈圖 ───────────────────────────────────────────
 
-/** Square desk: 32x32 pixels (2x2 tiles) — top-down wood surface */
+/** 方形書桌：32x32 像素（2x2 格）— 俯視木質桌面 */
 export const DESK_SQUARE_SPRITE: SpriteData = (() => {
-  const W = '#8B6914' // wood edge
-  const L = '#A07828' // lighter wood
-  const S = '#B8922E' // surface
-  const D = '#6B4E0A' // dark edge
+  const W = '#8B6914' // 木質邊緣
+  const L = '#A07828' // 淺木色
+  const S = '#B8922E' // 桌面
+  const D = '#6B4E0A' // 深色邊緣
   const rows: string[][] = []
-  // Row 0: empty
+  // 第 0 列：空白
   rows.push(new Array(32).fill(_))
-  // Row 1: top edge
+  // 第 1 列：頂部邊緣
   rows.push([_, ...new Array(30).fill(W), _])
-  // Rows 2-5: top surface
+  // 第 2-5 列：頂部桌面
   for (let r = 0; r < 4; r++) {
     rows.push([_, W, ...new Array(28).fill(r < 1 ? L : S), W, _])
   }
-  // Row 6: horizontal divider
+  // 第 6 列：水平分隔線
   rows.push([_, D, ...new Array(28).fill(W), D, _])
-  // Rows 7-12: middle surface area
+  // 第 7-12 列：中間桌面區域
   for (let r = 0; r < 6; r++) {
     rows.push([_, W, ...new Array(28).fill(S), W, _])
   }
-  // Row 13: center line
+  // 第 13 列：中心線
   rows.push([_, W, ...new Array(28).fill(L), W, _])
-  // Rows 14-19: lower surface
+  // 第 14-19 列：下方桌面
   for (let r = 0; r < 6; r++) {
     rows.push([_, W, ...new Array(28).fill(S), W, _])
   }
-  // Row 20: horizontal divider
+  // 第 20 列：水平分隔線
   rows.push([_, D, ...new Array(28).fill(W), D, _])
-  // Rows 21-24: bottom surface
+  // 第 21-24 列：底部桌面
   for (let r = 0; r < 4; r++) {
     rows.push([_, W, ...new Array(28).fill(r > 2 ? L : S), W, _])
   }
-  // Row 25: bottom edge
+  // 第 25 列：底部邊緣
   rows.push([_, ...new Array(30).fill(W), _])
-  // Rows 26-31: legs/shadow
+  // 第 26-31 列：桌腳/陰影
   for (let r = 0; r < 4; r++) {
     const row = new Array(32).fill(_) as string[]
     row[1] = D; row[2] = D; row[29] = D; row[30] = D
@@ -53,7 +53,7 @@ export const DESK_SQUARE_SPRITE: SpriteData = (() => {
   return rows
 })()
 
-/** Plant in pot: 16x24 */
+/** 盆栽植物：16x24 */
 export const PLANT_SPRITE: SpriteData = (() => {
   const G = '#3D8B37'
   const D = '#2D6B27'
@@ -88,7 +88,7 @@ export const PLANT_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Bookshelf: 16x32 (1 tile wide, 2 tiles tall) */
+/** 書架：16x32（1 格寬，2 格高） */
 export const BOOKSHELF_SPRITE: SpriteData = (() => {
   const W = '#8B6914'
   const D = '#6B4E0A'
@@ -133,7 +133,7 @@ export const BOOKSHELF_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Water cooler: 16x24 */
+/** 飲水機：16x24 */
 export const COOLER_SPRITE: SpriteData = (() => {
   const W = '#CCDDEE'
   const L = '#88BBDD'
@@ -167,7 +167,7 @@ export const COOLER_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Whiteboard: 32x16 (2 tiles wide, 1 tile tall) — hangs on wall */
+/** 白板：32x16（2 格寬，1 格高）— 掛在牆上 */
 export const WHITEBOARD_SPRITE: SpriteData = (() => {
   const F = '#AAAAAA'
   const W = '#EEEEFF'
@@ -193,7 +193,7 @@ export const WHITEBOARD_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Chair: 16x16 — top-down desk chair */
+/** 椅子：16x16 — 俯視辦公椅 */
 export const CHAIR_SPRITE: SpriteData = (() => {
   const W = '#8B6914'
   const D = '#6B4E0A'
@@ -219,7 +219,7 @@ export const CHAIR_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** PC monitor: 16x16 — top-down monitor on stand */
+/** 電腦螢幕：16x16 — 俯視支架上的螢幕 */
 export const PC_SPRITE: SpriteData = (() => {
   const F = '#555555'
   const S = '#3A3A5C'
@@ -245,7 +245,7 @@ export const PC_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Desk lamp: 16x16 — top-down lamp with light cone */
+/** 檯燈：16x16 — 俯視帶光錐的檯燈 */
 export const LAMP_SPRITE: SpriteData = (() => {
   const Y = '#FFDD55'
   const L = '#FFEE88'
@@ -272,9 +272,9 @@ export const LAMP_SPRITE: SpriteData = (() => {
   ]
 })()
 
-// ── New Furniture Sprites ──────────────────────────────────────
+// ── 新家具精靈圖 ──────────────────────────────────────
 
-/** Laptop: 16x16 — open laptop, top-down view (surface item) */
+/** 筆電：16x16 — 打開的筆電，俯視圖（表面項目） */
 export const LAPTOP_SPRITE: SpriteData = (() => {
   const F = '#444444' // frame
   const S = '#333333' // screen bezel
@@ -302,7 +302,7 @@ export const LAPTOP_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Printer: 16x24 — boxy office printer */
+/** 印表機：16x24 — 方形辦公室印表機 */
 export const PRINTER_SPRITE: SpriteData = (() => {
   const F = '#CCCCCC' // frame light
   const M = '#AAAAAA' // frame mid
@@ -338,7 +338,7 @@ export const PRINTER_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Coffee machine: 16x24 — drip coffee maker */
+/** 咖啡機：16x24 — 滴漏式咖啡機 */
 export const COFFEE_MACHINE_SPRITE: SpriteData = (() => {
   const F = '#444444' // frame
   const M = '#555555' // mid
@@ -376,7 +376,7 @@ export const COFFEE_MACHINE_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Sofa: 32x16 — two-seater couch (2 tiles wide, 1 tile tall) */
+/** 沙發：32x16 — 雙人沙發（2 格寬，1 格高） */
 export const SOFA_SPRITE: SpriteData = (() => {
   const F = '#5566AA' // fabric
   const L = '#6677BB' // fabric light
@@ -403,7 +403,7 @@ export const SOFA_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Filing cabinet: 16x24 — metal 3-drawer filing cabinet */
+/** 檔案櫃：16x24 — 金屬三抽屜檔案櫃 */
 export const FILING_CABINET_SPRITE: SpriteData = (() => {
   const F = '#999999' // frame
   const L = '#AAAAAA' // frame light
@@ -438,7 +438,7 @@ export const FILING_CABINET_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Wall clock: 16x16 — round clock face (wall item) */
+/** 掛鐘：16x16 — 圓形鐘面（牆面項目） */
 export const CLOCK_SPRITE: SpriteData = (() => {
   const F = '#8B6914' // frame wood
   const W = '#EEEEFF' // clock face
@@ -464,7 +464,7 @@ export const CLOCK_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Painting: 16x16 — framed landscape painting (wall item) */
+/** 畫作：16x16 — 有框風景畫（牆面項目） */
 export const PAINTING_SPRITE: SpriteData = (() => {
   const F = '#8B6914' // frame
   const D = '#6B4E0A' // frame dark
@@ -492,7 +492,7 @@ export const PAINTING_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Trash can: 16x16 — cylindrical office trash bin */
+/** 垃圾桶：16x16 — 圓柱形辦公室垃圾桶 */
 export const TRASH_CAN_SPRITE: SpriteData = (() => {
   const F = '#888888' // body
   const L = '#999999' // body light
@@ -519,7 +519,7 @@ export const TRASH_CAN_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Fridge: 16x32 — tall office refrigerator (1 tile wide, 2 tiles tall) */
+/** 冰箱：16x32 — 高型辦公室冰箱（1 格寬，2 格高） */
 export const FRIDGE_SPRITE: SpriteData = (() => {
   const F = '#CCCCCC' // body
   const L = '#DDDDDD' // body light
@@ -563,7 +563,7 @@ export const FRIDGE_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Vending machine: 16x32 — snack/drink vending machine (1 tile wide, 2 tiles tall) */
+/** 販賣機：16x32 — 零食/飲料販賣機（1 格寬，2 格高） */
 export const VENDING_MACHINE_SPRITE: SpriteData = (() => {
   const F = '#CC4444' // body red
   const D = '#AA3333' // body dark
@@ -609,7 +609,7 @@ export const VENDING_MACHINE_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Server rack: 16x32 — server rack with LEDs (1 tile wide, 2 tiles tall) */
+/** 伺服器機架：16x32 — 帶 LED 的伺服器機架（1 格寬，2 格高） */
 export const SERVER_RACK_SPRITE: SpriteData = (() => {
   const F = '#444444' // frame
   const M = '#555555' // panel
@@ -655,7 +655,7 @@ export const SERVER_RACK_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Window: 32x16 — office window with sky view (wall item, 2 tiles wide) */
+/** 窗戶：32x16 — 帶天空景色的辦公室窗戶（牆面項目，2 格寬） */
 export const WINDOW_SPRITE: SpriteData = (() => {
   const F = '#AAAAAA' // frame
   const D = '#888888' // frame dark
@@ -683,9 +683,9 @@ export const WINDOW_SPRITE: SpriteData = (() => {
   ]
 })()
 
-// ── Additional Furniture Sprites ──────────────────────────────────
+// ── 額外家具精靈圖 ──────────────────────────────────
 
-/** Meeting table: 32x32 (2x2 tiles) — large oval conference table, wood tones */
+/** 會議桌：32x32（2x2 格）— 大型橢圓會議桌，木色調 */
 export const MEETING_TABLE_SPRITE: SpriteData = (() => {
   const W = '#8B6914' // wood edge
   const L = '#A07828' // lighter wood
@@ -727,7 +727,7 @@ export const MEETING_TABLE_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Coffee table: 32x16 (2x1 tiles) — low rectangular table, lighter wood */
+/** 茶几：32x16（2x1 格）— 低矮長方形桌，淺木色 */
 export const COFFEE_TABLE_SPRITE: SpriteData = (() => {
   const W = '#A07828' // wood edge
   const S = '#C8A848' // surface light
@@ -753,7 +753,7 @@ export const COFFEE_TABLE_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Armchair: 16x16 — single cushioned lounge chair, warm red/burgundy fabric */
+/** 扶手椅：16x16 — 單人軟墊休閒椅，暖紅/酒紅色布料 */
 export const ARMCHAIR_SPRITE: SpriteData = (() => {
   const F = '#AA3333' // fabric dark
   const L = '#CC4444' // fabric mid
@@ -780,7 +780,7 @@ export const ARMCHAIR_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Large screen: 32x16 (2x1 tiles) — wall-mounted TV/monitor, thin bezel */
+/** 大螢幕：32x16（2x1 格）— 壁掛電視/螢幕，窄邊框 */
 export const LARGE_SCREEN_SPRITE: SpriteData = (() => {
   const F = '#333333' // frame/bezel
   const S = '#2A2A44' // screen dark
@@ -807,7 +807,7 @@ export const LARGE_SCREEN_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Bulletin board: 32x16 (2x1 tiles) — cork board with pinned notes */
+/** 布告欄：32x16（2x1 格）— 帶釘著便條的軟木板 */
 export const BULLETIN_BOARD_SPRITE: SpriteData = (() => {
   const F = '#8B6914' // wood frame
   const C = '#C4A05A' // cork
@@ -837,7 +837,7 @@ export const BULLETIN_BOARD_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** AC unit: 16x16 — wall air conditioner, white/gray */
+/** 冷氣：16x16 — 壁掛式冷氣，白色/灰色 */
 export const AC_UNIT_SPRITE: SpriteData = (() => {
   const F = '#DDDDDD' // body light
   const M = '#CCCCCC' // body mid
@@ -865,7 +865,7 @@ export const AC_UNIT_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Fire extinguisher: 16x16 — red fire extinguisher on wall mount */
+/** 滅火器：16x16 — 壁掛式紅色滅火器 */
 export const FIRE_EXTINGUISHER_SPRITE: SpriteData = (() => {
   const R = '#CC4444' // body red
   const D = '#AA3333' // body dark
@@ -893,7 +893,7 @@ export const FIRE_EXTINGUISHER_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Exit sign: 16x16 — green "EXIT" illuminated sign */
+/** 出口標誌：16x16 — 綠色 "EXIT" 發光標誌 */
 export const EXIT_SIGN_SPRITE: SpriteData = (() => {
   const F = '#333333' // frame
   const G = '#44AA66' // green background
@@ -918,7 +918,7 @@ export const EXIT_SIGN_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Desk phone: 16x16 — desk telephone, dark gray/black (surface item) */
+/** 桌上電話：16x16 — 辦公電話，深灰/黑色（表面項目） */
 export const PHONE_SPRITE: SpriteData = (() => {
   const F = '#444444' // body
   const D = '#333333' // body dark
@@ -946,7 +946,7 @@ export const PHONE_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Coffee mug: 16x16 — white/cream mug with steam (surface item) */
+/** 馬克杯：16x16 — 白色/奶油色馬克杯帶蒸氣（表面項目） */
 export const COFFEE_MUG_SPRITE: SpriteData = (() => {
   const W = '#EEEEEE' // mug white
   const M = '#DDDDDD' // mug mid
@@ -973,7 +973,7 @@ export const COFFEE_MUG_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Paper stack: 16x16 — stack of white papers (surface item) */
+/** 文件堆：16x16 — 白色文件堆（表面項目） */
 export const PAPER_STACK_SPRITE: SpriteData = (() => {
   const W = '#EEEEEE' // paper white
   const P = '#DDDDDD' // paper edge
@@ -1000,7 +1000,7 @@ export const PAPER_STACK_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Microwave: 16x16 — small microwave oven, white/silver */
+/** 微波爐：16x16 — 小型微波爐，白色/銀色 */
 export const MICROWAVE_SPRITE: SpriteData = (() => {
   const F = '#CCCCCC' // body
   const L = '#DDDDDD' // body light
@@ -1030,7 +1030,7 @@ export const MICROWAVE_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Sink: 16x16 — kitchen sink, silver/gray */
+/** 水槽：16x16 — 廚房水槽，銀色/灰色 */
 export const SINK_SPRITE: SpriteData = (() => {
   const F = '#BBBBBB' // body
   const L = '#CCCCCC' // body light
@@ -1059,7 +1059,7 @@ export const SINK_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Locker: 16x32 (1x2 tiles) — tall metal locker, gray/blue */
+/** 置物櫃：16x32（1x2 格）— 高型金屬置物櫃，灰色/藍色 */
 export const LOCKER_SPRITE: SpriteData = (() => {
   const F = '#7788AA' // body blue-gray
   const L = '#8899BB' // body light
@@ -1103,7 +1103,7 @@ export const LOCKER_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Coat rack: 16x24 — wooden coat rack/stand with hooks */
+/** 衣帽架：16x24 — 木製帶掛勾的衣帽架 */
 export const COAT_RACK_SPRITE: SpriteData = (() => {
   const W = '#8B6914' // wood
   const D = '#6B4E0A' // wood dark
@@ -1139,7 +1139,7 @@ export const COAT_RACK_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Potted cactus: 16x16 — small cactus in terra cotta pot */
+/** 仙人掌盆栽：16x16 — 陶土盆中的小仙人掌 */
 export const POTTED_CACTUS_SPRITE: SpriteData = (() => {
   const G = '#44AA66' // cactus green
   const D = '#338855' // cactus dark
@@ -1167,9 +1167,9 @@ export const POTTED_CACTUS_SPRITE: SpriteData = (() => {
   ]
 })()
 
-// ── Speech Bubble Sprites ───────────────────────────────────────
+// ── 對話氣泡精靈圖 ───────────────────────────────────────
 
-/** Permission bubble: white square with "..." in amber, and a tail pointer (11x13) */
+/** 權限氣泡：白色方框內琥珀色 "..."，帶尾部指標（11x13） */
 export const BUBBLE_PERMISSION_SPRITE: SpriteData = (() => {
   const B = '#555566' // border
   const F = '#EEEEFF' // fill
@@ -1191,7 +1191,7 @@ export const BUBBLE_PERMISSION_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Waiting bubble: white square with green checkmark, and a tail pointer (11x13) */
+/** 等待氣泡：白色方框內綠色勾號，帶尾部指標（11x13） */
 export const BUBBLE_WAITING_SPRITE: SpriteData = (() => {
   const B = '#555566' // border
   const F = '#EEEEFF' // fill
@@ -1213,7 +1213,7 @@ export const BUBBLE_WAITING_SPRITE: SpriteData = (() => {
   ]
 })()
 
-/** Detached bubble: white square with gray X, and a tail pointer (11x13) */
+/** 分離氣泡：白色方框內灰色 X，帶尾部指標（11x13） */
 export const BUBBLE_DETACHED_SPRITE: SpriteData = (() => {
   const B = '#555566' // border
   const F = '#EEEEFF' // fill
@@ -1235,10 +1235,10 @@ export const BUBBLE_DETACHED_SPRITE: SpriteData = (() => {
   ]
 })()
 
-// ── Character Sprites ───────────────────────────────────────────
-// 16x24 characters with palette substitution
+// ── 角色精靈圖 ───────────────────────────────────────────
+// 16x24 角色，使用調色盤替換
 
-/** Palette colors for 6 distinct agent characters */
+/** 6 個不同代理角色的調色盤顏色 */
 export const CHARACTER_PALETTES = [
   { skin: '#FFCC99', shirt: '#4488CC', pants: '#334466', hair: '#553322', shoes: '#222222' },
   { skin: '#FFCC99', shirt: '#CC4444', pants: '#333333', hair: '#FFD700', shoes: '#222222' },
@@ -1256,17 +1256,17 @@ interface CharPalette {
   shoes: string
 }
 
-// Template keys for character pixel data
+// 角色像素資料的模板鍵
 const H = 'hair'
 const K = 'skin'
 const S = 'shirt'
 const P = 'pants'
 const O = 'shoes'
-const E = '#FFFFFF' // eyes
+const E = '#FFFFFF' // 眼睛
 
 type TemplateCell = typeof H | typeof K | typeof S | typeof P | typeof O | typeof E | typeof _
 
-/** Resolve a template to SpriteData using a palette */
+/** 使用調色盤將模板解析為 SpriteData */
 function resolveTemplate(template: TemplateCell[][], palette: CharPalette): SpriteData {
   return template.map((row) =>
     row.map((cell) => {
@@ -1282,16 +1282,16 @@ function resolveTemplate(template: TemplateCell[][], palette: CharPalette): Spri
   )
 }
 
-/** Flip a template horizontally (for generating left sprites from right) */
+/** 水平翻轉模板（從右側精靈圖生成左側） */
 function flipHorizontal(template: TemplateCell[][]): TemplateCell[][] {
   return template.map((row) => [...row].reverse())
 }
 
 // ════════════════════════════════════════════════════════════════
-// DOWN-FACING SPRITES
+// 面朝下精靈圖
 // ════════════════════════════════════════════════════════════════
 
-// Walk down: 4 frames (1, 2=standing, 3=mirror legs, 2 again)
+// 向下行走：4 幀（1, 2=站立, 3=鏡像腿部, 再次 2）
 const CHAR_WALK_DOWN_1: TemplateCell[][] = [
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
   [_, _, _, _, _, _, H, H, H, H, _, _, _, _, _, _],
@@ -1373,7 +1373,7 @@ const CHAR_WALK_DOWN_3: TemplateCell[][] = [
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
 ]
 
-// Down typing: front-facing sitting, arms on keyboard
+// 面朝下打字：正面坐姿，雙手在鍵盤上
 const CHAR_DOWN_TYPE_1: TemplateCell[][] = [
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
@@ -1428,7 +1428,7 @@ const CHAR_DOWN_TYPE_2: TemplateCell[][] = [
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
 ]
 
-// Down reading: front-facing sitting, arms at sides, looking at screen
+// 面朝下閱讀：正面坐姿，雙手放側邊，看著螢幕
 const CHAR_DOWN_READ_1: TemplateCell[][] = [
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
@@ -1484,10 +1484,10 @@ const CHAR_DOWN_READ_2: TemplateCell[][] = [
 ]
 
 // ════════════════════════════════════════════════════════════════
-// UP-FACING SPRITES (back of head, no face)
+// 面朝上精靈圖（後腦勺，無臉部）
 // ════════════════════════════════════════════════════════════════
 
-// Walk up: back view, legs alternate
+// 向上行走：背面視角，雙腿交替
 const CHAR_WALK_UP_1: TemplateCell[][] = [
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
   [_, _, _, _, _, _, H, H, H, H, _, _, _, _, _, _],
@@ -1569,7 +1569,7 @@ const CHAR_WALK_UP_3: TemplateCell[][] = [
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
 ]
 
-// Up typing: back view, arms out to keyboard
+// 面朝上打字：背面視角，雙手伸向鍵盤
 const CHAR_UP_TYPE_1: TemplateCell[][] = [
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
@@ -1624,7 +1624,7 @@ const CHAR_UP_TYPE_2: TemplateCell[][] = [
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
 ]
 
-// Up reading: back view, arms at sides
+// 面朝上閱讀：背面視角，雙手放側邊
 const CHAR_UP_READ_1: TemplateCell[][] = [
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
@@ -1680,11 +1680,11 @@ const CHAR_UP_READ_2: TemplateCell[][] = [
 ]
 
 // ════════════════════════════════════════════════════════════════
-// RIGHT-FACING SPRITES (side profile, one eye visible)
-// Left sprites are generated by flipHorizontal()
+// 面朝右精靈圖（側面輪廓，一隻眼睛可見）
+// 左側精靈圖由 flipHorizontal() 生成
 // ════════════════════════════════════════════════════════════════
 
-// Right walk: side view, legs step
+// 向右行走：側面視角，腿部步進
 const CHAR_WALK_RIGHT_1: TemplateCell[][] = [
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
   [_, _, _, _, _, _, _, H, H, H, H, _, _, _, _, _],
@@ -1766,7 +1766,7 @@ const CHAR_WALK_RIGHT_3: TemplateCell[][] = [
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
 ]
 
-// Right typing: side profile sitting, one arm on keyboard
+// 面朝右打字：側面坐姿，一手在鍵盤上
 const CHAR_RIGHT_TYPE_1: TemplateCell[][] = [
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
@@ -1821,7 +1821,7 @@ const CHAR_RIGHT_TYPE_2: TemplateCell[][] = [
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
 ]
 
-// Right reading: side sitting, arms at side
+// 面朝右閱讀：側面坐姿，雙手放側邊
 const CHAR_RIGHT_READ_1: TemplateCell[][] = [
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
   [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _],
@@ -1877,11 +1877,11 @@ const CHAR_RIGHT_READ_2: TemplateCell[][] = [
 ]
 
 // ════════════════════════════════════════════════════════════════
-// Template export (for export-characters script)
+// 模板匯出（供 export-characters 腳本使用）
 // ════════════════════════════════════════════════════════════════
 
-/** All character templates grouped by direction, for use by the export script.
- *  Frame order per direction: walk1, walk2, walk3, type1, type2, read1, read2 */
+/** 所有角色模板按方向分組，供匯出腳本使用。
+ *  每個方向的幀順序：walk1, walk2, walk3, type1, type2, read1, read2 */
 export const CHARACTER_TEMPLATES = {
   down: [
     CHAR_WALK_DOWN_1, CHAR_WALK_DOWN_2, CHAR_WALK_DOWN_3,
@@ -1901,7 +1901,7 @@ export const CHARACTER_TEMPLATES = {
 } as const
 
 // ════════════════════════════════════════════════════════════════
-// Loaded character sprites (from PNG assets)
+// 已載入的角色精靈圖（來自 PNG 素材）
 // ════════════════════════════════════════════════════════════════
 
 interface LoadedCharacterData {
@@ -1912,20 +1912,20 @@ interface LoadedCharacterData {
 
 let loadedCharacters: LoadedCharacterData[] | null = null
 
-/** Set pre-colored character sprites loaded from PNG assets. Call this when characterSpritesLoaded message arrives. */
+/** 設定從 PNG 素材載入的預著色角色精靈圖。當收到 characterSpritesLoaded 訊息時呼叫。 */
 export function setCharacterTemplates(data: LoadedCharacterData[]): void {
   loadedCharacters = data
-  // Clear cache so sprites are rebuilt from loaded data
+  // 清除快取以便從載入的資料重建精靈圖
   spriteCache.clear()
 }
 
-/** Flip a SpriteData horizontally (for generating left sprites from right) */
+/** 水平翻轉 SpriteData（從右側精靈圖生成左側） */
 function flipSpriteHorizontal(sprite: SpriteData): SpriteData {
   return sprite.map((row) => [...row].reverse())
 }
 
 // ════════════════════════════════════════════════════════════════
-// Sprite resolution + caching
+// 精靈圖解析 + 快取
 // ════════════════════════════════════════════════════════════════
 
 export interface CharacterSprites {
@@ -1936,7 +1936,7 @@ export interface CharacterSprites {
 
 const spriteCache = new Map<string, CharacterSprites>()
 
-/** Apply hue shift to every sprite in a CharacterSprites set */
+/** 對 CharacterSprites 集合中的每個精靈圖套用色相偏移 */
 function hueShiftSprites(sprites: CharacterSprites, hueShift: number): CharacterSprites {
   const color: FloorColor = { h: hueShift, s: 0, b: 0, c: 0 }
   const shift = (s: SpriteData) => adjustSprite(s, color)
@@ -1974,7 +1974,7 @@ export function getCharacterSprites(paletteIndex: number, hueShift = 0): Charact
   let sprites: CharacterSprites
 
   if (loadedCharacters) {
-    // Use pre-colored character sprites directly (no palette swapping)
+    // 直接使用預著色角色精靈圖（無調色盤交換）
     const char = loadedCharacters[paletteIndex % loadedCharacters.length]
     const d = char.down
     const u = char.up
@@ -2002,7 +2002,7 @@ export function getCharacterSprites(paletteIndex: number, hueShift = 0): Charact
       },
     }
   } else {
-    // Fallback: use hardcoded templates with palette swapping
+    // 備選：使用硬編碼模板搭配調色盤交換
     const pal = CHARACTER_PALETTES[paletteIndex % CHARACTER_PALETTES.length]
     const r = (t: TemplateCell[][]) => resolveTemplate(t, pal)
     const rf = (t: TemplateCell[][]) => resolveTemplate(flipHorizontal(t), pal)
@@ -2029,7 +2029,7 @@ export function getCharacterSprites(paletteIndex: number, hueShift = 0): Charact
     }
   }
 
-  // Apply hue shift if non-zero
+  // 若色相偏移非零則套用
   if (hueShift !== 0) {
     sprites = hueShiftSprites(sprites, hueShift)
   }

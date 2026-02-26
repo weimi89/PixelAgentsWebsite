@@ -1,20 +1,20 @@
 /**
- * Shared sprite colorization module.
+ * 共用精靈圖著色模組。
  *
- * Two modes:
- * - Colorize (Photoshop-style): grayscale → fixed HSL. For floor tiles and opt-in furniture.
- * - Adjust (default for furniture): shift original pixel HSL values.
+ * 兩種模式：
+ * - Colorize（Photoshop 風格）：灰階 → 固定 HSL。用於地板磚和選擇啟用的家具。
+ * - Adjust（家具預設模式）：偏移原始像素的 HSL 值。
  */
 
 import type { SpriteData, FloorColor } from './types.js'
 
-/** Generic colorized sprite cache: arbitrary string key → SpriteData */
+/** 通用著色精靈圖快取：任意字串鍵 → SpriteData */
 const colorizeCache = new Map<string, SpriteData>()
 
 /**
- * Get a color-adjusted sprite from cache, or compute and cache it.
- * Dispatches to colorize or adjust mode based on `color.colorize`.
- * Caller provides a unique cache key that must include the colorize flag.
+ * 從快取取得色彩調整後的精靈圖，若無則計算並快取。
+ * 根據 `color.colorize` 分派至 colorize 或 adjust 模式。
+ * 呼叫者提供唯一的快取鍵，該鍵必須包含 colorize 旗標。
  */
 export function getColorizedSprite(cacheKey: string, sprite: SpriteData, color: FloorColor): SpriteData {
   const cached = colorizeCache.get(cacheKey)
@@ -24,20 +24,20 @@ export function getColorizedSprite(cacheKey: string, sprite: SpriteData, color: 
   return result
 }
 
-/** Clear all cached colorized sprites (e.g., on asset reload) */
+/** 清除所有已快取的著色精靈圖（例如素材重新載入時） */
 export function clearColorizeCache(): void {
   colorizeCache.clear()
 }
 
 /**
- * Colorize a sprite using HSL transformation.
+ * 使用 HSL 轉換對精靈圖著色。
  *
- * Algorithm (Photoshop Colorize-style):
- * 1. Parse each pixel's color as perceived luminance (0-1)
- * 2. Apply contrast: stretch/compress around midpoint 0.5
- * 3. Apply brightness: shift lightness up/down
- * 4. Create HSL color with user's hue + saturation
- * 5. Convert HSL -> RGB -> hex
+ * 演算法（Photoshop Colorize 風格）：
+ * 1. 解析每個像素的顏色為感知亮度（0-1）
+ * 2. 套用對比度：以中點 0.5 為基準拉伸/壓縮
+ * 3. 套用亮度：向上/向下偏移明度
+ * 4. 以使用者的色相 + 飽和度建立 HSL 顏色
+ * 5. 轉換 HSL -> RGB -> hex
  */
 export function colorizeSprite(sprite: SpriteData, color: FloorColor): SpriteData {
   const { h, s, b, c } = color
@@ -51,28 +51,28 @@ export function colorizeSprite(sprite: SpriteData, color: FloorColor): SpriteDat
         continue
       }
 
-      // Parse hex to get RGB values
+      // 解析 hex 以取得 RGB 值
       const r = parseInt(pixel.slice(1, 3), 16)
       const g = parseInt(pixel.slice(3, 5), 16)
       const bv = parseInt(pixel.slice(5, 7), 16)
-      // Use perceived luminance for grayscale
+      // 使用感知亮度進行灰階計算
       let lightness = (0.299 * r + 0.587 * g + 0.114 * bv) / 255
 
-      // Apply contrast: expand/compress around 0.5
+      // 套用對比度：以 0.5 為基準拉伸/壓縮
       if (c !== 0) {
         const factor = (100 + c) / 100
         lightness = 0.5 + (lightness - 0.5) * factor
       }
 
-      // Apply brightness: shift up/down
+      // 套用亮度：向上/向下偏移
       if (b !== 0) {
         lightness = lightness + b / 200
       }
 
-      // Clamp
+      // 限制範圍
       lightness = Math.max(0, Math.min(1, lightness))
 
-      // Convert HSL to RGB
+      // 轉換 HSL 為 RGB
       const satFrac = s / 100
       const hex = hslToHex(h, satFrac, lightness)
       newRow.push(hex)
@@ -83,7 +83,7 @@ export function colorizeSprite(sprite: SpriteData, color: FloorColor): SpriteDat
   return result
 }
 
-/** Convert HSL (h: 0-360, s: 0-1, l: 0-1) to #RRGGBB hex string */
+/** 將 HSL（h: 0-360, s: 0-1, l: 0-1）轉換為 #RRGGBB hex 字串 */
 function hslToHex(h: number, s: number, l: number): string {
   const c = (1 - Math.abs(2 * l - 1)) * s
   const hp = h / 60
@@ -109,7 +109,7 @@ function clamp255(v: number): number {
   return Math.max(0, Math.min(255, v))
 }
 
-/** Convert RGB (0-255 each) to HSL (h: 0-360, s: 0-1, l: 0-1) */
+/** 將 RGB（各 0-255）轉換為 HSL（h: 0-360, s: 0-1, l: 0-1） */
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   const rf = r / 255, gf = g / 255, bf = b / 255
   const max = Math.max(rf, gf, bf), min = Math.min(rf, gf, bf)
@@ -125,12 +125,12 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
 }
 
 /**
- * Adjust a sprite's colors by shifting HSL values (default mode for furniture).
+ * 透過偏移 HSL 值調整精靈圖的顏色（家具的預設模式）。
  *
- * H slider (-180 to +180): rotates hue
- * S slider (-100 to +100): shifts saturation
- * B slider (-100 to 100): shifts lightness
- * C slider (-100 to 100): adjusts contrast around midpoint
+ * H 滑桿（-180 到 +180）：旋轉色相
+ * S 滑桿（-100 到 +100）：偏移飽和度
+ * B 滑桿（-100 到 100）：偏移明度
+ * C 滑桿（-100 到 100）：以中點為基準調整對比度
  */
 export function adjustSprite(sprite: SpriteData, color: FloorColor): SpriteData {
   const { h: hShift, s: sShift, b, c } = color
@@ -149,20 +149,20 @@ export function adjustSprite(sprite: SpriteData, color: FloorColor): SpriteData 
       const bv = parseInt(pixel.slice(5, 7), 16)
       const [origH, origS, origL] = rgbToHsl(r, g, bv)
 
-      // Shift hue
+      // 偏移色相
       const newH = ((origH + hShift) % 360 + 360) % 360
 
-      // Shift saturation
+      // 偏移飽和度
       const newS = Math.max(0, Math.min(1, origS + sShift / 100))
 
-      // Apply contrast: expand/compress around 0.5
+      // 套用對比度：以 0.5 為基準拉伸/壓縮
       let lightness = origL
       if (c !== 0) {
         const factor = (100 + c) / 100
         lightness = 0.5 + (lightness - 0.5) * factor
       }
 
-      // Apply brightness
+      // 套用亮度
       if (b !== 0) {
         lightness = lightness + b / 200
       }

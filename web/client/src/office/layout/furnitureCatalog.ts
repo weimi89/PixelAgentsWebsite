@@ -66,7 +66,7 @@ export interface CatalogEntryWithCategory extends FurnitureCatalogEntry {
 }
 
 export const FURNITURE_CATALOG: CatalogEntryWithCategory[] = [
-  // ── Original hand-drawn sprites ──
+  // ── 原始手繪精靈圖 ──
   { type: FurnitureType.DESK,       label: 'Desk',       footprintW: 2, footprintH: 2, sprite: DESK_SQUARE_SPRITE,  isDesk: true,  category: 'desks' },
   { type: FurnitureType.BOOKSHELF,  label: 'Bookshelf',  footprintW: 1, footprintH: 2, sprite: BOOKSHELF_SPRITE,    isDesk: false, category: 'storage' },
   { type: FurnitureType.PLANT,      label: 'Plant',      footprintW: 1, footprintH: 1, sprite: PLANT_SPRITE,        isDesk: false, category: 'decor' },
@@ -76,7 +76,7 @@ export const FURNITURE_CATALOG: CatalogEntryWithCategory[] = [
   { type: FurnitureType.PC,         label: 'PC',         footprintW: 1, footprintH: 1, sprite: PC_SPRITE,           isDesk: false, category: 'electronics' },
   { type: FurnitureType.LAMP,       label: 'Lamp',       footprintW: 1, footprintH: 1, sprite: LAMP_SPRITE,         isDesk: false, category: 'decor' },
 
-  // ── New furniture sprites ──
+  // ── 新家具精靈圖 ──
   { type: FurnitureType.LAPTOP,          label: '筆電',     footprintW: 1, footprintH: 1, sprite: LAPTOP_SPRITE,          isDesk: false, category: 'electronics', canPlaceOnSurfaces: true },
   { type: FurnitureType.PRINTER,         label: '印表機',   footprintW: 1, footprintH: 1, sprite: PRINTER_SPRITE,         isDesk: false, category: 'electronics' },
   { type: FurnitureType.COFFEE_MACHINE,  label: '咖啡機',   footprintW: 1, footprintH: 1, sprite: COFFEE_MACHINE_SPRITE,  isDesk: false, category: 'misc' },
@@ -90,7 +90,7 @@ export const FURNITURE_CATALOG: CatalogEntryWithCategory[] = [
   { type: FurnitureType.SERVER_RACK,     label: '伺服器',   footprintW: 1, footprintH: 2, sprite: SERVER_RACK_SPRITE,     isDesk: false, category: 'electronics' },
   { type: FurnitureType.WINDOW,          label: '窗戶',     footprintW: 2, footprintH: 1, sprite: WINDOW_SPRITE,          isDesk: false, category: 'wall', canPlaceOnWalls: true },
 
-  // ── Batch 2 furniture sprites ──
+  // ── 第二批家具精靈圖 ──
   { type: FurnitureType.MEETING_TABLE,      label: '會議桌',     footprintW: 2, footprintH: 2, sprite: MEETING_TABLE_SPRITE,      isDesk: true,  category: 'desks' },
   { type: FurnitureType.COFFEE_TABLE,       label: '茶几',       footprintW: 2, footprintH: 1, sprite: COFFEE_TABLE_SPRITE,       isDesk: false, category: 'desks' },
   { type: FurnitureType.ARMCHAIR,           label: '扶手椅',     footprintW: 1, footprintH: 1, sprite: ARMCHAIR_SPRITE,           isDesk: false, category: 'chairs' },
@@ -110,42 +110,42 @@ export const FURNITURE_CATALOG: CatalogEntryWithCategory[] = [
 
 ]
 
-// ── Rotation groups ──────────────────────────────────────────────
-// Flexible rotation: supports 2+ orientations (not just all 4)
+// ── 旋轉群組 ──────────────────────────────────────────────
+// 彈性旋轉：支援 2 個以上的朝向（不僅限 4 個）
 interface RotationGroup {
-  /** Ordered list of orientations available for this group */
+  /** 此群組可用朝向的有序列表 */
   orientations: string[]
-  /** Maps orientation → asset ID (for the default/off state) */
+  /** 映射朝向 → 素材 ID（對應預設/關閉狀態） */
   members: Record<string, string>
 }
 
-// Maps any member asset ID → its rotation group
+// 映射任何成員素材 ID → 其所屬旋轉群組
 const rotationGroups = new Map<string, RotationGroup>()
 
-// ── State groups ────────────────────────────────────────────────
-// Maps asset ID → its on/off counterpart (symmetric for toggle)
+// ── 狀態群組 ────────────────────────────────────────────────
+// 映射素材 ID → 其開/關對應項（對稱切換）
 const stateGroups = new Map<string, string>()
-// Directional maps for getOnStateType / getOffStateType
-const offToOn = new Map<string, string>()  // off asset → on asset
-const onToOff = new Map<string, string>()  // on asset → off asset
+// 用於 getOnStateType / getOffStateType 的方向性映射
+const offToOn = new Map<string, string>()  // 關閉素材 → 開啟素材
+const onToOff = new Map<string, string>()  // 開啟素材 → 關閉素材
 
-// Internal catalog (includes all variants for getCatalogEntry lookups)
+// 內部目錄（包含所有變體，供 getCatalogEntry 查詢使用）
 let internalCatalog: CatalogEntryWithCategory[] | null = null
 
-// Dynamic catalog built from loaded assets (when available)
-// Only includes "front" variants for grouped items (shown in editor palette)
+// 從載入的素材建構的動態目錄（可用時使用）
+// 僅包含群組項目的 "front" 變體（顯示在編輯器調色盤中）
 let dynamicCatalog: CatalogEntryWithCategory[] | null = null
 let dynamicCategories: FurnitureCategory[] | null = null
 
 /**
- * Build catalog from loaded assets. Returns true if successful.
- * Once built, all getCatalog* functions use the dynamic catalog.
- * Uses ONLY custom assets (excludes hardcoded furniture when assets are loaded).
+ * 從載入的素材建構目錄。成功時返回 true。
+ * 建構完成後，所有 getCatalog* 函式使用動態目錄。
+ * 僅使用自訂素材（素材載入時排除硬編碼家具）。
  */
 export function buildDynamicCatalog(assets: LoadedAssetData): boolean {
   if (!assets?.catalog || !assets?.sprites) return false
 
-  // Build all entries (including non-front variants)
+  // 建構所有條目（包含非 front 變體）
   const allEntries = assets.catalog.map((asset) => {
     const sprite = assets.sprites[asset.id]
     if (!sprite) {
@@ -169,17 +169,17 @@ export function buildDynamicCatalog(assets: LoadedAssetData): boolean {
 
   if (allEntries.length === 0) return false
 
-  // Build rotation groups from groupId + orientation metadata
+  // 從 groupId + orientation 元資料建構旋轉群組
   rotationGroups.clear()
   stateGroups.clear()
   offToOn.clear()
   onToOff.clear()
 
-  // Phase 1: Collect orientations per group (only "off" or stateless variants for rotation)
+  // 階段 1：收集每個群組的朝向（旋轉僅使用 "off" 或無狀態變體）
   const groupMap = new Map<string, Map<string, string>>() // groupId → (orientation → assetId)
   for (const asset of assets.catalog) {
     if (asset.groupId && asset.orientation) {
-      // For rotation groups, only use the "off" or stateless variant
+      // 旋轉群組僅使用 "off" 或無狀態變體
       if (asset.state && asset.state !== 'off') continue
       let orientMap = groupMap.get(asset.groupId)
       if (!orientMap) {
@@ -190,12 +190,12 @@ export function buildDynamicCatalog(assets: LoadedAssetData): boolean {
     }
   }
 
-  // Phase 2: Register rotation groups with 2+ orientations
+  // 階段 2：註冊具有 2 個以上朝向的旋轉群組
   const nonFrontIds = new Set<string>()
   const orientationOrder = ['front', 'right', 'back', 'left']
   for (const orientMap of groupMap.values()) {
     if (orientMap.size < 2) continue
-    // Build ordered list of available orientations
+    // 建構可用朝向的有序列表
     const orderedOrients = orientationOrder.filter((o) => orientMap.has(o))
     if (orderedOrients.length < 2) continue
     const members: Record<string, string> = {}
@@ -206,13 +206,13 @@ export function buildDynamicCatalog(assets: LoadedAssetData): boolean {
     for (const id of Object.values(members)) {
       rotationGroups.set(id, rg)
     }
-    // Track non-front IDs to exclude from visible catalog
+    // 追蹤非 front ID 以從可見目錄中排除
     for (const [orient, id] of Object.entries(members)) {
       if (orient !== 'front') nonFrontIds.add(id)
     }
   }
 
-  // Phase 3: Build state groups (on ↔ off pairs within same groupId + orientation)
+  // 階段 3：建構狀態群組（同一 groupId + orientation 內的 on ↔ off 配對）
   const stateMap = new Map<string, Map<string, string>>() // "groupId|orientation" → (state → assetId)
   for (const asset of assets.catalog) {
     if (asset.groupId && asset.state) {
@@ -236,20 +236,20 @@ export function buildDynamicCatalog(assets: LoadedAssetData): boolean {
     }
   }
 
-  // Also register rotation groups for "on" state variants (so rotation works on on-state items too)
+  // 也為 "on" 狀態變體註冊旋轉群組（使旋轉功能也能作用於開啟狀態的項目）
   for (const asset of assets.catalog) {
     if (asset.groupId && asset.orientation && asset.state === 'on') {
-      // Find the off-variant's rotation group
+      // 找到關閉變體的旋轉群組
       const offCounterpart = stateGroups.get(asset.id)
       if (offCounterpart) {
         const offGroup = rotationGroups.get(offCounterpart)
         if (offGroup) {
-          // Build an equivalent group for the "on" state
+          // 為 "on" 狀態建構等價群組
           const onMembers: Record<string, string> = {}
           for (const orient of offGroup.orientations) {
             const offId = offGroup.members[orient]
             const onId = stateGroups.get(offId)
-            // Use on-state variant if available, otherwise fall back to off-state
+            // 若有開啟狀態變體則使用，否則回退至關閉狀態
             onMembers[orient] = onId ?? offId
           }
           const onGroup: RotationGroup = { orientations: offGroup.orientations, members: onMembers }
@@ -263,19 +263,19 @@ export function buildDynamicCatalog(assets: LoadedAssetData): boolean {
     }
   }
 
-  // Track "on" variant IDs to exclude from visible catalog
+  // 追蹤 "on" 變體 ID 以從可見目錄中排除
   const onStateIds = new Set<string>()
   for (const asset of assets.catalog) {
     if (asset.state === 'on') onStateIds.add(asset.id)
   }
 
-  // Store full internal catalog (all variants — for getCatalogEntry lookups)
+  // 儲存完整內部目錄（所有變體 — 供 getCatalogEntry 查詢使用）
   internalCatalog = allEntries
 
-  // Visible catalog: exclude non-front variants and "on" state variants
+  // 可見目錄：排除非 front 變體和 "on" 狀態變體
   const visibleEntries = allEntries.filter((e) => !nonFrontIds.has(e.type) && !onStateIds.has(e.type))
 
-  // Strip orientation/state suffix from labels for grouped variants
+  // 移除群組變體標籤的朝向/狀態後綴
   for (const entry of visibleEntries) {
     if (rotationGroups.has(entry.type) || stateGroups.has(entry.type)) {
       entry.label = entry.label
@@ -296,7 +296,7 @@ export function buildDynamicCatalog(assets: LoadedAssetData): boolean {
 }
 
 export function getCatalogEntry(type: string): CatalogEntryWithCategory | undefined {
-  // Check internal catalog first (includes all variants, e.g., non-front rotations)
+  // 先檢查內部目錄（包含所有變體，例如非 front 旋轉）
   if (internalCatalog) {
     return internalCatalog.find((e) => e.type === type)
   }
@@ -328,9 +328,9 @@ export const FURNITURE_CATEGORIES: Array<{ id: FurnitureCategory; label: string 
   { id: 'misc', label: '其他' },
 ]
 
-// ── Rotation helpers ─────────────────────────────────────────────
+// ── 旋轉輔助函式 ─────────────────────────────────────────────
 
-/** Returns the next asset ID in the rotation group (cw or ccw), or null if not rotatable. */
+/** 返回旋轉群組中的下一個素材 ID（順時針或逆時針），若不可旋轉則返回 null。 */
 export function getRotatedType(currentType: string, direction: 'cw' | 'ccw'): string | null {
   const group = rotationGroups.get(currentType)
   if (!group) return null
@@ -342,22 +342,22 @@ export function getRotatedType(currentType: string, direction: 'cw' | 'ccw'): st
   return order[nextIdx]
 }
 
-/** Returns the toggled state variant (on↔off), or null if no state variant exists. */
+/** 返回切換後的狀態變體（on↔off），若無狀態變體則返回 null。 */
 export function getToggledType(currentType: string): string | null {
   return stateGroups.get(currentType) ?? null
 }
 
-/** Returns the "on" variant if this type has one, otherwise returns the type unchanged. */
+/** 若此類型有 "on" 變體則返回，否則返回原類型不變。 */
 export function getOnStateType(currentType: string): string {
   return offToOn.get(currentType) ?? currentType
 }
 
-/** Returns the "off" variant if this type has one, otherwise returns the type unchanged. */
+/** 若此類型有 "off" 變體則返回，否則返回原類型不變。 */
 export function getOffStateType(currentType: string): string {
   return onToOff.get(currentType) ?? currentType
 }
 
-/** Returns true if the given furniture type is part of a rotation group. */
+/** 若指定的家具類型屬於旋轉群組則返回 true。 */
 export function isRotatable(type: string): boolean {
   return rotationGroups.has(type)
 }

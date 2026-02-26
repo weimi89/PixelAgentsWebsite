@@ -58,7 +58,7 @@ interface EditorToolbarProps {
   loadedAssets?: LoadedAssetData
 }
 
-/** Render a floor pattern preview at 2x (32x32 canvas showing the 16x16 tile) */
+/** 以 2 倍渲染地板花紋預覽（32x32 canvas 顯示 16x16 磚塊） */
 function FloorPatternPreview({ patternIndex, color, selected, onClick }: {
   patternIndex: number
   color: FloorColor
@@ -114,7 +114,7 @@ function FloorPatternPreview({ patternIndex, color, selected, onClick }: {
   )
 }
 
-/** Slider control for a single color parameter */
+/** 單一色彩參數的滑桿控制項 */
 function ColorSlider({ label, value, min, max, onChange }: {
   label: string
   value: number
@@ -161,7 +161,7 @@ export function EditorToolbar({
   const [showWallColor, setShowWallColor] = useState(false)
   const [showFurnitureColor, setShowFurnitureColor] = useState(false)
 
-  // Build dynamic catalog from loaded assets
+  // 從載入的素材建構動態目錄
   useEffect(() => {
     if (loadedAssets) {
       try {
@@ -169,7 +169,7 @@ export function EditorToolbar({
         const success = buildDynamicCatalog(loadedAssets)
         console.log(`[EditorToolbar] Catalog build result: ${success}`)
 
-        // Reset to first available category if current doesn't exist
+        // 若當前分類不存在，重設至第一個可用分類
         const activeCategories = getActiveCategories()
         if (activeCategories.length > 0) {
           const firstCat = activeCategories[0]?.id
@@ -192,7 +192,7 @@ export function EditorToolbar({
     onWallColorChange({ ...wallColor, [key]: value })
   }, [wallColor, onWallColorChange])
 
-  // For selected furniture: use existing color or default
+  // 對於選取的家具：使用現有色彩或預設值
   const effectiveColor = selectedFurnitureColor ?? DEFAULT_FURNITURE_COLOR
   const handleSelFurnColorChange = useCallback((key: keyof FloorColor, value: number) => {
     onSelectedFurnitureColorChange({ ...effectiveColor, [key]: value })
@@ -201,7 +201,7 @@ export function EditorToolbar({
   const categoryItems = getCatalogByCategory(activeCategory)
 
   const patternCount = getFloorPatternCount()
-  // Wall is TileType 0, floor patterns are 1..patternCount
+  // 牆壁為 TileType 0，地板花紋為 1..patternCount
   const floorPatterns = Array.from({ length: patternCount }, (_, i) => i + 1)
 
   const thumbSize = 36 // 2x for items
@@ -229,7 +229,7 @@ export function EditorToolbar({
         maxWidth: 'calc(100vw - 20px)',
       }}
     >
-      {/* Tool row — at the bottom */}
+      {/* 工具列 — 在底部 */}
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
         <button
           style={isFloorActive ? activeBtnStyle : btnStyle}
@@ -261,10 +261,10 @@ export function EditorToolbar({
         </button>
       </div>
 
-      {/* Sub-panel: Floor tiles — stacked bottom-to-top via column-reverse */}
+      {/* 子面板：地板磚 — 透過 column-reverse 從底部向上堆疊 */}
       {isFloorActive && (
         <div style={{ display: 'flex', flexDirection: 'column-reverse', gap: 6 }}>
-          {/* Color toggle + Pick — just above tool row */}
+          {/* 色彩切換 + 拾取 — 位於工具列正上方 */}
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             <button
               style={showColor ? activeBtnStyle : btnStyle}
@@ -282,7 +282,7 @@ export function EditorToolbar({
             </button>
           </div>
 
-          {/* Color controls (collapsible) — above Wall/Color/Pick */}
+          {/* 色彩控制項（可折疊）— 位於牆壁/色彩/拾取上方 */}
           {showColor && (
             <div style={{
               display: 'flex',
@@ -300,7 +300,7 @@ export function EditorToolbar({
             </div>
           )}
 
-          {/* Floor pattern horizontal carousel — at the top */}
+          {/* 地板花紋水平輪播 — 在頂部 */}
           <div style={{ display: 'flex', gap: 4, overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 2 }}>
             {floorPatterns.map((patIdx) => (
               <FloorPatternPreview
@@ -315,10 +315,10 @@ export function EditorToolbar({
         </div>
       )}
 
-      {/* Sub-panel: Wall — stacked bottom-to-top via column-reverse */}
+      {/* 子面板：牆壁 — 透過 column-reverse 從底部向上堆疊 */}
       {isWallActive && (
         <div style={{ display: 'flex', flexDirection: 'column-reverse', gap: 6 }}>
-          {/* Color toggle — just above tool row */}
+          {/* 色彩切換 — 位於工具列正上方 */}
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             <button
               style={showWallColor ? activeBtnStyle : btnStyle}
@@ -329,7 +329,7 @@ export function EditorToolbar({
             </button>
           </div>
 
-          {/* Color controls (collapsible) */}
+          {/* 色彩控制項（可折疊） */}
           {showWallColor && (
             <div style={{
               display: 'flex',
@@ -350,10 +350,10 @@ export function EditorToolbar({
         </div>
       )}
 
-      {/* Sub-panel: Furniture — stacked bottom-to-top via column-reverse */}
+      {/* 子面板：家具 — 透過 column-reverse 從底部向上堆疊 */}
       {isFurnitureActive && (
         <div style={{ display: 'flex', flexDirection: 'column-reverse', gap: 4 }}>
-          {/* Category tabs + Pick — just above tool row */}
+          {/* 分類標籤 + 拾取 — 位於工具列正上方 */}
           <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
             {getActiveCategories().map((cat) => (
               <button
@@ -373,7 +373,7 @@ export function EditorToolbar({
               {t.pick}
             </button>
           </div>
-          {/* Furniture items — single-row horizontal carousel at 2x */}
+          {/* 家具項目 — 2 倍大小的單行水平輪播 */}
           <div style={{ display: 'flex', gap: 4, overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 2 }}>
             {categoryItems.map((entry) => {
               const cached = getCachedSprite(entry.sprite, 2)
@@ -421,7 +421,7 @@ export function EditorToolbar({
         </div>
       )}
 
-      {/* Selected furniture color panel — shows when any placed furniture item is selected */}
+      {/* 選取家具色彩面板 — 當選取任何已放置的家具時顯示 */}
       {selectedFurnitureUid && (
         <div style={{ display: 'flex', flexDirection: 'column-reverse', gap: 3 }}>
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>

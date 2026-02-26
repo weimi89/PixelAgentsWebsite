@@ -1,4 +1,4 @@
-// ── Timing (ms) ──────────────────────────────────────────────
+// ── 計時（毫秒）──────────────────────────────────────────────
 export const JSONL_POLL_INTERVAL_MS = 1000;
 export const FILE_WATCHER_POLL_INTERVAL_MS = 2000;
 export const PROJECT_SCAN_INTERVAL_MS = 1000;
@@ -6,11 +6,11 @@ export const TOOL_DONE_DELAY_MS = 300;
 export const PERMISSION_TIMER_DELAY_MS = 7000;
 export const TEXT_IDLE_DELAY_MS = 5000;
 
-// ── Display Truncation ──────────────────────────────────────
+// ── 顯示截斷 ──────────────────────────────────────
 export const BASH_COMMAND_DISPLAY_MAX_LENGTH = 30;
 export const TASK_DESCRIPTION_DISPLAY_MAX_LENGTH = 40;
 
-// ── PNG / Asset Parsing ─────────────────────────────────────
+// ── PNG / 素材解析 ─────────────────────────────────────
 export const PNG_ALPHA_THRESHOLD = 128;
 export const WALL_PIECE_WIDTH = 16;
 export const WALL_PIECE_HEIGHT = 32;
@@ -24,18 +24,18 @@ export const CHAR_FRAME_H = 32;
 export const CHAR_FRAMES_PER_ROW = 7;
 export const CHAR_COUNT = 6;
 
-// ── User-Level Persistence ──────────────────────────────────
+// ── 使用者層級持久化 ──────────────────────────────────
 export const LAYOUT_FILE_DIR = '.pixel-agents';
 export const LAYOUT_FILE_NAME = 'layout.json';
 export const SETTINGS_FILE_NAME = 'settings.json';
 export const AGENTS_FILE_NAME = 'agents.json';
 export const AGENT_SEATS_FILE_NAME = 'agent-seats.json';
 
-// ── Auto-detection ──────────────────────────────────────────
-export const ACTIVE_JSONL_MAX_AGE_MS = 30_000; // 30s — files modified within this window are "active"
+// ── 自動偵測 ──────────────────────────────────────────
+export const ACTIVE_JSONL_MAX_AGE_MS = 30_000; // 30 秒 — 在此時間窗口內被修改的檔案視為「活躍」
 
 // ── tmux ─────────────────────────────────────────────────────
 export const TMUX_HEALTH_CHECK_INTERVAL_MS = 5000;
 
-// ── Server ──────────────────────────────────────────────────
+// ── 伺服器 ──────────────────────────────────────────────────
 export const DEFAULT_PORT = 3000;

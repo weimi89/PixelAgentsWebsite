@@ -1,4 +1,4 @@
-/** Map status prefixes back to tool names for animation selection */
+/** 將狀態前綴映射回工具名稱，用於動畫選取 */
 export const STATUS_TO_TOOL: Record<string, string> = {
   'Reading': 'Read',
   'Searching': 'Grep',
@@ -21,7 +21,7 @@ export function extractToolName(status: string): string | null {
 
 import { ZOOM_DEFAULT_DPR_FACTOR, ZOOM_MIN } from '../constants.js'
 
-/** Compute a default integer zoom level (device pixels per sprite pixel) */
+/** 計算預設的整數縮放等級（裝置像素 / 精靈圖像素） */
 export function defaultZoom(): number {
   const dpr = window.devicePixelRatio || 1
   return Math.max(ZOOM_MIN, Math.round(ZOOM_DEFAULT_DPR_FACTOR * dpr))

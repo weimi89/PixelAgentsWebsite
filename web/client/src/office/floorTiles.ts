@@ -1,74 +1,74 @@
 /**
- * Floor tile pattern storage and caching.
+ * 地板磚花紋儲存與快取。
  *
- * Stores 7 grayscale floor patterns loaded from floors.png.
- * Uses shared colorize module for HSL tinting (Photoshop-style Colorize).
- * Caches colorized SpriteData by (pattern, h, s, b, c) key.
+ * 儲存從 floors.png 載入的 7 種灰階地板花紋。
+ * 使用共用 colorize 模組進行 HSL 著色（Photoshop 風格 Colorize）。
+ * 以 (pattern, h, s, b, c) 為鍵快取著色後的 SpriteData。
  */
 
 import type { SpriteData, FloorColor } from './types.js'
 import { getColorizedSprite, clearColorizeCache } from './colorize.js'
 import { TILE_SIZE, FALLBACK_FLOOR_COLOR } from '../constants.js'
 
-/** Default solid gray 16×16 tile used when floors.png is not loaded */
+/** 當 floors.png 未載入時使用的預設純灰色 16×16 磚塊 */
 const DEFAULT_FLOOR_SPRITE: SpriteData = Array.from(
   { length: TILE_SIZE },
   () => Array(TILE_SIZE).fill(FALLBACK_FLOOR_COLOR) as string[],
 )
 
-/** Module-level storage for floor tile sprites (set once on load) */
+/** 模組層級的地板磚精靈圖儲存（載入時設定一次） */
 let floorSprites: SpriteData[] = []
 
-/** Wall color constant */
+/** 牆壁顏色常數 */
 export const WALL_COLOR = '#3A3A5C'
 
-/** Set floor tile sprites (called once when extension sends floorTilesLoaded) */
+/** 設定地板磚精靈圖（當擴充傳送 floorTilesLoaded 時呼叫一次） */
 export function setFloorSprites(sprites: SpriteData[]): void {
   floorSprites = sprites
   clearColorizeCache()
 }
 
-/** Get the raw (grayscale) floor sprite for a pattern index (1-7 -> array index 0-6).
- *  Falls back to the default solid gray tile when floors.png is not loaded. */
+/** 取得指定花紋索引的原始（灰階）地板精靈圖（1-7 -> 陣列索引 0-6）。
+ *  當 floors.png 未載入時，回退至預設純灰色磚塊。 */
 export function getFloorSprite(patternIndex: number): SpriteData | null {
   const idx = patternIndex - 1
   if (idx < 0) return null
   if (idx < floorSprites.length) return floorSprites[idx]
-  // No PNG sprites loaded — return default solid tile for any valid pattern index
+  // 無 PNG 精靈圖載入 — 對任何有效的花紋索引返回預設純色磚塊
   if (floorSprites.length === 0 && patternIndex >= 1) return DEFAULT_FLOOR_SPRITE
   return null
 }
 
-/** Check if floor sprites are available (always true — falls back to default solid tile) */
+/** 檢查地板精靈圖是否可用（始終為 true — 回退至預設純色磚塊） */
 export function hasFloorSprites(): boolean {
   return true
 }
 
-/** Get count of available floor patterns (at least 1 for the default solid tile) */
+/** 取得可用地板花紋數量（至少 1，即預設純色磚塊） */
 export function getFloorPatternCount(): number {
   return floorSprites.length > 0 ? floorSprites.length : 1
 }
 
-/** Get all floor sprites (for preview rendering, falls back to default solid tile) */
+/** 取得所有地板精靈圖（用於預覽渲染，回退至預設純色磚塊） */
 export function getAllFloorSprites(): SpriteData[] {
   return floorSprites.length > 0 ? floorSprites : [DEFAULT_FLOOR_SPRITE]
 }
 
 /**
- * Get a colorized version of a floor sprite.
- * Uses Photoshop-style Colorize: grayscale -> HSL with given hue/saturation,
- * then brightness/contrast adjustment.
+ * 取得地板精靈圖的著色版本。
+ * 使用 Photoshop 風格 Colorize：灰階 -> 以指定色相/飽和度建立 HSL，
+ * 然後進行亮度/對比度調整。
  */
 export function getColorizedFloorSprite(patternIndex: number, color: FloorColor): SpriteData {
   const key = `floor-${patternIndex}-${color.h}-${color.s}-${color.b}-${color.c}`
 
   const base = getFloorSprite(patternIndex)
   if (!base) {
-    // Return a 16x16 magenta error tile
+    // 返回 16x16 洋紅色錯誤磚塊
     const err: SpriteData = Array.from({ length: 16 }, () => Array(16).fill('#FF00FF'))
     return err
   }
 
-  // Floor tiles are always colorized (grayscale patterns need Photoshop-style Colorize)
+  // 地板磚一律使用著色模式（灰階花紋需要 Photoshop 風格 Colorize）
   return getColorizedSprite(key, base, { ...color, colorize: true })
 }

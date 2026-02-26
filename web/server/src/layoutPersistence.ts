@@ -36,8 +36,8 @@ export function writeLayoutToFile(layout: Record<string, unknown>): void {
 }
 
 /**
- * Load layout: file first, then fall back to default layout.
- * No VS Code workspace state migration needed in web version.
+ * 載入佈局：優先從檔案載入，然後回退至預設佈局。
+ * Web 版本不需要 VS Code 工作區狀態遷移。
  */
 export function loadLayout(
 	defaultLayout?: Record<string, unknown> | null,

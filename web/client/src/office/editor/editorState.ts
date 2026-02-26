@@ -6,39 +6,39 @@ export class EditorState {
   isEditMode = false
   activeTool: EditTool = EditTool.SELECT
   selectedTileType: TileTypeVal = TileType.FLOOR_1
-  selectedFurnitureType: string = 'desk' // FurnitureType.DESK or asset ID
+  selectedFurnitureType: string = 'desk' // FurnitureType.DESK 或素材 ID
 
-  // Floor color settings (applied to new tiles when painting)
+  // 地板色彩設定（繪製時套用至新磚塊）
   floorColor: FloorColor = { ...DEFAULT_FLOOR_COLOR }
 
-  // Wall color settings (applied to new wall tiles when painting)
+  // 牆壁色彩設定（繪製時套用至新牆磚）
   wallColor: FloorColor = { ...DEFAULT_WALL_COLOR }
 
-  // Tracks toggle direction during wall drag (true=adding walls, false=removing, null=undecided)
+  // 追蹤牆壁拖曳期間的切換方向（true=新增牆壁, false=移除, null=未決定）
   wallDragAdding: boolean | null = null
 
-  // Picked furniture color (copied by pick tool, applied on placement)
+  // 拾取的家具色彩（由拾取工具複製，放置時套用）
   pickedFurnitureColor: FloorColor | null = null
 
-  // Ghost preview position
+  // 幽靈預覽位置
   ghostCol = -1
   ghostRow = -1
   ghostValid = false
 
-  // Selection
+  // 選取
   selectedFurnitureUid: string | null = null
 
-  // Mouse drag state (tile paint)
+  // 滑鼠拖曳狀態（磚塊繪製）
   isDragging = false
 
-  // Undo / Redo stacks
+  // 撤銷 / 重做堆疊
   undoStack: OfficeLayout[] = []
   redoStack: OfficeLayout[] = []
 
-  // Dirty flag — true when layout differs from last save
+  // 髒旗標 — 當佈局與上次儲存不同時為 true
   isDirty = false
 
-  // Drag-to-move state
+  // 拖曳移動狀態
   dragUid: string | null = null
   dragStartCol = 0
   dragStartRow = 0
@@ -48,7 +48,7 @@ export class EditorState {
 
   pushUndo(layout: OfficeLayout): void {
     this.undoStack.push(layout)
-    // Limit undo stack size
+    // 限制撤銷堆疊大小
     if (this.undoStack.length > UNDO_STACK_MAX_SIZE) {
       this.undoStack.shift()
     }
