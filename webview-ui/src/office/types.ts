@@ -104,6 +104,23 @@ export const FurnitureType = {
   VENDING_MACHINE: 'vending_machine',
   SERVER_RACK: 'server_rack',
   WINDOW: 'window',
+  // Batch 2 furniture sprites
+  MEETING_TABLE: 'meeting_table',
+  COFFEE_TABLE: 'coffee_table',
+  ARMCHAIR: 'armchair',
+  LARGE_SCREEN: 'large_screen',
+  BULLETIN_BOARD: 'bulletin_board',
+  AC_UNIT: 'ac_unit',
+  FIRE_EXTINGUISHER: 'fire_extinguisher',
+  EXIT_SIGN: 'exit_sign',
+  PHONE: 'phone',
+  COFFEE_MUG: 'coffee_mug',
+  PAPER_STACK: 'paper_stack',
+  MICROWAVE: 'microwave',
+  SINK: 'sink',
+  LOCKER: 'locker',
+  COAT_RACK: 'coat_rack',
+  POTTED_CACTUS: 'potted_cactus',
 } as const
 export type FurnitureType = (typeof FurnitureType)[keyof typeof FurnitureType]
 

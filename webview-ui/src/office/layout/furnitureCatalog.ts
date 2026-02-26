@@ -21,6 +21,22 @@ import {
   VENDING_MACHINE_SPRITE,
   SERVER_RACK_SPRITE,
   WINDOW_SPRITE,
+  MEETING_TABLE_SPRITE,
+  COFFEE_TABLE_SPRITE,
+  ARMCHAIR_SPRITE,
+  LARGE_SCREEN_SPRITE,
+  BULLETIN_BOARD_SPRITE,
+  AC_UNIT_SPRITE,
+  FIRE_EXTINGUISHER_SPRITE,
+  EXIT_SIGN_SPRITE,
+  PHONE_SPRITE,
+  COFFEE_MUG_SPRITE,
+  PAPER_STACK_SPRITE,
+  MICROWAVE_SPRITE,
+  SINK_SPRITE,
+  LOCKER_SPRITE,
+  COAT_RACK_SPRITE,
+  POTTED_CACTUS_SPRITE,
 } from '../sprites/spriteData.js'
 
 export interface LoadedAssetData {
@@ -73,6 +89,24 @@ export const FURNITURE_CATALOG: CatalogEntryWithCategory[] = [
   { type: FurnitureType.VENDING_MACHINE, label: 'Vending Machine', footprintW: 1, footprintH: 2, sprite: VENDING_MACHINE_SPRITE, isDesk: false, category: 'misc' },
   { type: FurnitureType.SERVER_RACK,     label: 'Server Rack',     footprintW: 1, footprintH: 2, sprite: SERVER_RACK_SPRITE,     isDesk: false, category: 'electronics' },
   { type: FurnitureType.WINDOW,          label: 'Window',          footprintW: 2, footprintH: 1, sprite: WINDOW_SPRITE,          isDesk: false, category: 'wall', canPlaceOnWalls: true },
+
+  // ── Batch 2 furniture sprites ──
+  { type: FurnitureType.MEETING_TABLE,      label: 'Meeting Table',      footprintW: 2, footprintH: 2, sprite: MEETING_TABLE_SPRITE,      isDesk: true,  category: 'desks' },
+  { type: FurnitureType.COFFEE_TABLE,       label: 'Coffee Table',       footprintW: 2, footprintH: 1, sprite: COFFEE_TABLE_SPRITE,       isDesk: false, category: 'desks' },
+  { type: FurnitureType.ARMCHAIR,           label: 'Armchair',           footprintW: 1, footprintH: 1, sprite: ARMCHAIR_SPRITE,           isDesk: false, category: 'chairs' },
+  { type: FurnitureType.LARGE_SCREEN,       label: 'Large Screen',       footprintW: 2, footprintH: 1, sprite: LARGE_SCREEN_SPRITE,       isDesk: false, category: 'wall', canPlaceOnWalls: true },
+  { type: FurnitureType.BULLETIN_BOARD,     label: 'Bulletin Board',     footprintW: 2, footprintH: 1, sprite: BULLETIN_BOARD_SPRITE,     isDesk: false, category: 'wall', canPlaceOnWalls: true },
+  { type: FurnitureType.AC_UNIT,            label: 'AC Unit',            footprintW: 1, footprintH: 1, sprite: AC_UNIT_SPRITE,            isDesk: false, category: 'wall', canPlaceOnWalls: true },
+  { type: FurnitureType.FIRE_EXTINGUISHER,  label: 'Fire Extinguisher',  footprintW: 1, footprintH: 1, sprite: FIRE_EXTINGUISHER_SPRITE,  isDesk: false, category: 'wall', canPlaceOnWalls: true },
+  { type: FurnitureType.EXIT_SIGN,          label: 'Exit Sign',          footprintW: 1, footprintH: 1, sprite: EXIT_SIGN_SPRITE,          isDesk: false, category: 'wall', canPlaceOnWalls: true },
+  { type: FurnitureType.PHONE,              label: 'Phone',              footprintW: 1, footprintH: 1, sprite: PHONE_SPRITE,              isDesk: false, category: 'electronics', canPlaceOnSurfaces: true },
+  { type: FurnitureType.COFFEE_MUG,         label: 'Coffee Mug',         footprintW: 1, footprintH: 1, sprite: COFFEE_MUG_SPRITE,         isDesk: false, category: 'misc', canPlaceOnSurfaces: true },
+  { type: FurnitureType.PAPER_STACK,        label: 'Paper Stack',        footprintW: 1, footprintH: 1, sprite: PAPER_STACK_SPRITE,        isDesk: false, category: 'misc', canPlaceOnSurfaces: true },
+  { type: FurnitureType.MICROWAVE,          label: 'Microwave',          footprintW: 1, footprintH: 1, sprite: MICROWAVE_SPRITE,          isDesk: false, category: 'electronics' },
+  { type: FurnitureType.SINK,               label: 'Sink',               footprintW: 1, footprintH: 1, sprite: SINK_SPRITE,               isDesk: false, category: 'misc' },
+  { type: FurnitureType.LOCKER,             label: 'Locker',             footprintW: 1, footprintH: 2, sprite: LOCKER_SPRITE,             isDesk: false, category: 'storage' },
+  { type: FurnitureType.COAT_RACK,          label: 'Coat Rack',          footprintW: 1, footprintH: 1, sprite: COAT_RACK_SPRITE,          isDesk: false, category: 'decor' },
+  { type: FurnitureType.POTTED_CACTUS,      label: 'Cactus',             footprintW: 1, footprintH: 1, sprite: POTTED_CACTUS_SPRITE,      isDesk: false, category: 'decor' },
 
 ]
 
