@@ -113,6 +113,30 @@ export const TOOL_OVERLAY_VERTICAL_OFFSET = 32
 export const PULSE_ANIMATION_DURATION_SEC = 1.5
 export const DETACHED_CHARACTER_ALPHA = 0.45
 
+// ── 角色行為 ──────────────────────────────────────────────────
+export const CHAT_DURATION_MIN_SEC = 3.0
+export const CHAT_DURATION_MAX_SEC = 8.0
+export const CHAT_PROXIMITY_TILES = 2
+export const INTERACT_DURATION_MIN_SEC = 2.0
+export const INTERACT_DURATION_MAX_SEC = 5.0
+export const THINK_PACE_DISTANCE = 3
+export const STRETCH_DURATION_SEC = 2.5
+export const USE_WALL_DURATION_MIN_SEC = 3.0
+export const USE_WALL_DURATION_MAX_SEC = 6.0
+export const SLEEP_TRIGGER_IDLE_SEC = 300.0
+export const STRETCH_TRIGGER_SIT_SEC = 180.0
+export const EMOTE_DISPLAY_DURATION_SEC = 2.0
+export const EMOTE_VERTICAL_OFFSET_PX = 28
+export const EMOTE_FADE_DURATION_SEC = 0.5
+export const SLEEP_ZZZ_REFRESH_SEC = 3.0
+
+// ── 漫遊行為權重 ────────────────────────────────────────────
+export const WANDER_WEIGHT_RANDOM = 40
+export const WANDER_WEIGHT_FURNITURE = 20
+export const WANDER_WEIGHT_CHAT = 15
+export const WANDER_WEIGHT_WALL = 15
+export const WANDER_WEIGHT_RETURN_SEAT = 10
+
 // ── 觸控 ────────────────────────────────────────────────────
 export const LONG_PRESS_DURATION_MS = 500
 

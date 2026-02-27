@@ -66,12 +66,21 @@ export function processTranscriptLine(
 			const blocks = record.message.content as Array<{
 				type: string; id?: string; name?: string; input?: Record<string, unknown>;
 			}>;
+
+			// 偵測 thinking 區塊
+			const hasThinking = blocks.some(b => b.type === 'thinking');
+			if (hasThinking) {
+				sender?.postMessage({ type: 'agentThinking', id: agentId, thinking: true });
+			}
+
 			const hasToolUse = blocks.some(b => b.type === 'tool_use');
 
 			if (hasToolUse) {
 				cancelWaitingTimer(agentId, waitingTimers);
 				agent.isWaiting = false;
 				agent.hadToolsInTurn = true;
+				// 工具使用開始時清除思考狀態
+				sender?.postMessage({ type: 'agentThinking', id: agentId, thinking: false });
 				sender?.postMessage({ type: 'agentStatus', id: agentId, status: 'active' });
 				let hasNonExemptTool = false;
 				for (const block of blocks) {
@@ -149,6 +158,8 @@ export function processTranscriptLine(
 		} else if (record.type === 'system' && record.subtype === 'turn_duration') {
 			cancelWaitingTimer(agentId, waitingTimers);
 			cancelPermissionTimer(agentId, permissionTimers);
+			// 回合結束時清除思考狀態
+			sender?.postMessage({ type: 'agentThinking', id: agentId, thinking: false });
 
 			if (agent.activeToolIds.size > 0) {
 				agent.activeToolIds.clear();

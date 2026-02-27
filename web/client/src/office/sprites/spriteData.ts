@@ -1235,6 +1235,133 @@ export const BUBBLE_DETACHED_SPRITE: SpriteData = (() => {
   ]
 })()
 
+// ── 表情精靈圖（7x7 像素）──────────────────────────────────
+
+import type { EmoteType } from '../types.js'
+import { EmoteType as Emote } from '../types.js'
+
+/** 咖啡杯表情（棕色杯 + 蒸氣） */
+export const EMOTE_COFFEE_SPRITE: SpriteData = (() => {
+  const B = '#8B4513' // 棕色
+  const L = '#D2691E' // 淺棕
+  const W = '#FFFFFF' // 白色蒸氣
+  return [
+    [_, _, W, _, W, _, _],
+    [_, W, _, W, _, _, _],
+    [_, _, B, B, B, _, _],
+    [_, B, L, L, L, B, _],
+    [_, B, L, L, L, B, _],
+    [_, _, B, B, B, _, _],
+    [_, _, B, B, B, _, _],
+  ]
+})()
+
+/** 水滴表情（藍色） */
+export const EMOTE_WATER_SPRITE: SpriteData = (() => {
+  const B = '#2196F3' // 藍色
+  const L = '#64B5F6' // 淺藍
+  return [
+    [_, _, _, B, _, _, _],
+    [_, _, B, B, B, _, _],
+    [_, B, L, L, B, _, _],
+    [_, B, L, L, L, B, _],
+    [B, L, L, L, L, B, _],
+    [B, L, L, L, B, _, _],
+    [_, B, B, B, _, _, _],
+  ]
+})()
+
+/** 星星表情（黃色） */
+export const EMOTE_STAR_SPRITE: SpriteData = (() => {
+  const Y = '#FFD700' // 金色
+  const L = '#FFF59D' // 淺黃
+  return [
+    [_, _, _, Y, _, _, _],
+    [_, _, Y, L, Y, _, _],
+    [Y, Y, L, L, L, Y, Y],
+    [_, Y, L, L, L, Y, _],
+    [_, Y, L, L, L, Y, _],
+    [_, Y, _, _, _, Y, _],
+    [Y, _, _, _, _, _, Y],
+  ]
+})()
+
+/** zzZ 表情（藍色） */
+export const EMOTE_ZZZ_SPRITE: SpriteData = (() => {
+  const B = '#5C6BC0' // 靛藍
+  const L = '#9FA8DA' // 淺靛
+  return [
+    [_, _, _, _, _, _, _],
+    [_, B, B, B, _, _, _],
+    [_, _, _, B, _, _, _],
+    [_, _, B, _, L, L, _],
+    [_, B, B, B, _, L, _],
+    [_, _, _, _, L, L, _],
+    [_, _, _, _, _, _, _],
+  ]
+})()
+
+/** 燈泡表情（黃色） */
+export const EMOTE_IDEA_SPRITE: SpriteData = (() => {
+  const Y = '#FFD700' // 金色
+  const L = '#FFF59D' // 淺黃
+  const G = '#757575' // 灰色底座
+  return [
+    [_, _, Y, Y, Y, _, _],
+    [_, Y, L, L, L, Y, _],
+    [_, Y, L, L, L, Y, _],
+    [_, Y, L, L, L, Y, _],
+    [_, _, Y, Y, Y, _, _],
+    [_, _, G, G, G, _, _],
+    [_, _, _, G, _, _, _],
+  ]
+})()
+
+/** 愛心表情（紅色） */
+export const EMOTE_HEART_SPRITE: SpriteData = (() => {
+  const R = '#E53935' // 紅色
+  const L = '#EF9A9A' // 淺紅
+  return [
+    [_, R, R, _, R, R, _],
+    [R, L, L, R, L, L, R],
+    [R, L, L, L, L, L, R],
+    [R, L, L, L, L, L, R],
+    [_, R, L, L, L, R, _],
+    [_, _, R, L, R, _, _],
+    [_, _, _, R, _, _, _],
+  ]
+})()
+
+/** 音符表情（紫色） */
+export const EMOTE_NOTE_SPRITE: SpriteData = (() => {
+  const P = '#7E57C2' // 紫色
+  const L = '#B39DDB' // 淺紫
+  return [
+    [_, _, _, P, P, P, _],
+    [_, _, _, P, L, P, _],
+    [_, _, _, P, _, _, _],
+    [_, _, _, P, _, _, _],
+    [_, _, _, P, _, _, _],
+    [_, P, L, P, _, _, _],
+    [_, P, P, _, _, _, _],
+  ]
+})()
+
+const EMOTE_SPRITES: Record<EmoteType, SpriteData> = {
+  [Emote.COFFEE]: EMOTE_COFFEE_SPRITE,
+  [Emote.WATER]: EMOTE_WATER_SPRITE,
+  [Emote.STAR]: EMOTE_STAR_SPRITE,
+  [Emote.ZZZ]: EMOTE_ZZZ_SPRITE,
+  [Emote.IDEA]: EMOTE_IDEA_SPRITE,
+  [Emote.HEART]: EMOTE_HEART_SPRITE,
+  [Emote.NOTE]: EMOTE_NOTE_SPRITE,
+}
+
+/** 取得指定表情類型的精靈圖 */
+export function getEmoteSprite(emoteType: EmoteType): SpriteData {
+  return EMOTE_SPRITES[emoteType]
+}
+
 // ── 角色精靈圖 ───────────────────────────────────────────
 // 16x24 角色，使用調色盤替換
 

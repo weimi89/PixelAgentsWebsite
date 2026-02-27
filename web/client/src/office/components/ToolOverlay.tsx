@@ -1,7 +1,8 @@
 import type { ToolActivity } from '../types.js'
 import type { OfficeState } from '../engine/officeState.js'
 import type { SubagentCharacter } from '../../hooks/useExtensionMessages.js'
-import { TILE_SIZE, CharacterState } from '../types.js'
+import { TILE_SIZE } from '../types.js'
+import { isSittingState } from '../engine/characters.js'
 import { TOOL_OVERLAY_VERTICAL_OFFSET, CHARACTER_SITTING_OFFSET_PX } from '../../constants.js'
 import { t } from '../../i18n.js'
 import { useRenderTick } from '../../hooks/useRenderTick.js'
@@ -88,7 +89,7 @@ export function ToolOverlay({
         if (!isSelected && !isHovered) return null
 
         // 定位於角色上方
-        const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0
+        const sittingOffset = isSittingState(ch.state) ? CHARACTER_SITTING_OFFSET_PX : 0
         const screenX = (deviceOffsetX + ch.x * zoom) / dpr
         const screenY = (deviceOffsetY + (ch.y + sittingOffset - TOOL_OVERLAY_VERTICAL_OFFSET) * zoom) / dpr
 

@@ -1,6 +1,7 @@
 import type { OfficeState } from '../office/engine/officeState.js'
 import type { SubagentCharacter } from '../hooks/useExtensionMessages.js'
-import { TILE_SIZE, CharacterState } from '../office/types.js'
+import { TILE_SIZE } from '../office/types.js'
+import { isSittingState } from '../office/engine/characters.js'
 import { t } from '../i18n.js'
 import { useRenderTick } from '../hooks/useRenderTick.js'
 import { formatModelName } from '../utils.js'
@@ -60,7 +61,7 @@ export function AgentLabels({
         if (!ch) return null
 
         // 角色位置：裝置像素 → CSS 像素（跟隨坐姿偏移）
-        const sittingOffset = ch.state === CharacterState.TYPE ? 14 : 0
+        const sittingOffset = isSittingState(ch.state) ? 14 : 0
         // 當非斷線的對話氣泡顯示時隱藏標籤（讓氣泡單獨可見）
         // 斷線氣泡是持久的 — 同時顯示標籤
         if (ch.bubbleType && ch.bubbleType !== 'detached') return null

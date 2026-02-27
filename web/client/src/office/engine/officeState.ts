@@ -14,7 +14,8 @@ import {
   CHARACTER_HIT_HEIGHT,
 } from '../../constants.js'
 import type { Character, Seat, FurnitureInstance, TileType as TileTypeVal, OfficeLayout, PlacedFurniture } from '../types.js'
-import { createCharacter, updateCharacter } from './characters.js'
+import { createCharacter, updateCharacter, isSittingState } from './characters.js'
+import type { UpdateContext } from './characters.js'
 import { matrixEffectSeeds } from './matrixEffect.js'
 import { isWalkable, getWalkableTiles, findPath } from '../layout/tileMap.js'
 import {
@@ -635,10 +636,45 @@ export class OfficeState {
     }
   }
 
+  /** 建構家具位置查找表（"col,row" → 家具資訊） */
+  private buildFurnitureMap(): Map<string, { col: number; row: number; type: string }> {
+    const map = new Map<string, { col: number; row: number; type: string }>()
+    for (const item of this.layout.furniture) {
+      const entry = getCatalogEntry(item.type)
+      const w = entry ? entry.footprintW : 1
+      const h = entry ? entry.footprintH : 1
+      for (let dr = 0; dr < h; dr++) {
+        for (let dc = 0; dc < w; dc++) {
+          map.set(`${item.col + dc},${item.row + dr}`, { col: item.col + dc, row: item.row + dr, type: item.type })
+        }
+      }
+    }
+    return map
+  }
+
+  setAgentThinking(id: number, thinking: boolean): void {
+    const ch = this.characters.get(id)
+    if (ch) {
+      ch.isThinking = thinking
+    }
+  }
+
   update(dt: number): void {
     if (this.furnitureDirty) {
       this.rebuildFurnitureInstances()
     }
+
+    // 建構 UpdateContext（每幀共享）
+    const furnitureMap = this.buildFurnitureMap()
+    const ctx: UpdateContext = {
+      walkableTiles: this.walkableTiles,
+      seats: this.seats,
+      tileMap: this.tileMap,
+      blockedTiles: this.blockedTiles,
+      allCharacters: this.characters,
+      furnitureMap,
+    }
+
     const toDelete: number[] = []
     for (const ch of this.characters.values()) {
       // 處理 Matrix 特效動畫
@@ -646,12 +682,10 @@ export class OfficeState {
         ch.matrixEffectTimer += dt
         if (ch.matrixEffectTimer >= MATRIX_EFFECT_DURATION) {
           if (ch.matrixEffect === 'spawn') {
-            // 生成完成 — 清除特效，恢復正常 FSM
             ch.matrixEffect = null
             ch.matrixEffectTimer = 0
             ch.matrixEffectSeeds = []
           } else {
-            // 消散完成 — 標記為待刪除
             toDelete.push(ch.id)
           }
         }
@@ -660,8 +694,17 @@ export class OfficeState {
 
       // 暫時解除自身座位封鎖，讓角色可以尋路至座位
       this.withOwnSeatUnblocked(ch, () =>
-        updateCharacter(ch, dt, this.walkableTiles, this.seats, this.tileMap, this.blockedTiles)
+        updateCharacter(ch, dt, ctx)
       )
+
+      // 遞減表情計時器
+      if (ch.emoteType && ch.emoteTimer > 0) {
+        ch.emoteTimer -= dt
+        if (ch.emoteTimer <= 0) {
+          ch.emoteType = null
+          ch.emoteTimer = 0
+        }
+      }
 
       // 遞減等待氣泡的計時器（不含權限/斷線氣泡）
       if (ch.bubbleType === 'waiting') {
@@ -689,7 +732,7 @@ export class OfficeState {
     let bestY = -Infinity
     for (const ch of this.characters.values()) {
       if (ch.matrixEffect === 'despawn') continue
-      const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0
+      const sittingOffset = isSittingState(ch.state) ? CHARACTER_SITTING_OFFSET_PX : 0
       const anchorY = ch.y + sittingOffset
       const left = ch.x - CHARACTER_HIT_HALF_WIDTH
       const right = ch.x + CHARACTER_HIT_HALF_WIDTH

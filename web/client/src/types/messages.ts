@@ -43,6 +43,7 @@ export type ServerMessage =
   | { type: 'subagentClear'; id: number; parentToolId: string }
   | { type: 'agentModel'; id: number; model: string }
   | { type: 'agentDetached'; id: number; detached: boolean }
+  | { type: 'agentThinking'; id: number; thinking: boolean }
   | { type: 'characterSpritesLoaded'; characters: CharacterSpriteDirections[] }
   | { type: 'floorTilesLoaded'; sprites: string[][][] }
   | { type: 'wallTilesLoaded'; sprites: string[][][] }

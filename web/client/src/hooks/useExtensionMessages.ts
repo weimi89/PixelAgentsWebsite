@@ -325,6 +325,9 @@ export function useExtensionMessages(
         })
         os.removeSubagent(id, parentToolId)
         setSubagentCharacters((prev) => prev.filter((s) => !(s.parentAgentId === id && s.parentToolId === parentToolId)))
+      } else if (msg.type === 'agentThinking') {
+        const { id, thinking } = msg
+        os.setAgentThinking(id, thinking)
       } else if (msg.type === 'agentDetached') {
         const { id, detached } = msg
         os.setAgentDetached(id, detached)

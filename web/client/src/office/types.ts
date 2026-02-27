@@ -38,8 +38,26 @@ export const CharacterState = {
   IDLE: 'idle',
   WALK: 'walk',
   TYPE: 'type',
+  CHAT: 'chat',
+  INTERACT: 'interact',
+  STAND_WORK: 'stand_work',
+  THINK: 'think',
+  STRETCH: 'stretch',
+  USE_WALL: 'use_wall',
+  SLEEP: 'sleep',
 } as const
 export type CharacterState = (typeof CharacterState)[keyof typeof CharacterState]
+
+export const EmoteType = {
+  COFFEE: 'coffee',
+  WATER: 'water',
+  STAR: 'star',
+  ZZZ: 'zzz',
+  IDEA: 'idea',
+  HEART: 'heart',
+  NOTE: 'note',
+} as const
+export type EmoteType = (typeof EmoteType)[keyof typeof EmoteType]
 
 export const Direction = {
   DOWN: 0,
@@ -225,4 +243,24 @@ export interface Character {
   matrixEffectTimer: number
   /** 每欄的隨機種子（16 個值），用於交錯雨滴時序 */
   matrixEffectSeeds: number[]
+  /** 當前表情類型，或 null */
+  emoteType: EmoteType | null
+  /** 表情顯示倒數（秒） */
+  emoteTimer: number
+  /** 思考模式（來回踱步）—— 由伺服器設定 */
+  isThinking: boolean
+  /** 久坐累計時間（秒），用於觸發 STRETCH */
+  sitTimer: number
+  /** 閒置累計時間（秒），用於觸發 SLEEP */
+  sleepTimer: number
+  /** CHAT 目標角色 ID，或 null */
+  chatPartnerId: number | null
+  /** 互動目標家具格位，或 null */
+  interactTarget: { col: number; row: number } | null
+  /** 當前所在的 THINK 踱步路徑 */
+  thinkPath: Array<{ col: number; row: number }>
+  /** THINK 踱步方向標記 */
+  thinkForward: boolean
+  /** 行為狀態倒數計時器（通用） */
+  behaviorTimer: number
 }

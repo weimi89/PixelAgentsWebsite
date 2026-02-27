@@ -1,8 +1,8 @@
-import { TileType, TILE_SIZE, CharacterState } from '../types.js'
+import { TileType, TILE_SIZE } from '../types.js'
 import type { TileType as TileTypeVal, FurnitureInstance, Character, SpriteData, Seat, FloorColor } from '../types.js'
 import { getCachedSprite, getOutlineSprite } from '../sprites/spriteCache.js'
-import { getCharacterSprites, BUBBLE_PERMISSION_SPRITE, BUBBLE_WAITING_SPRITE, BUBBLE_DETACHED_SPRITE } from '../sprites/spriteData.js'
-import { getCharacterSprite } from './characters.js'
+import { getCharacterSprites, BUBBLE_PERMISSION_SPRITE, BUBBLE_WAITING_SPRITE, BUBBLE_DETACHED_SPRITE, getEmoteSprite } from '../sprites/spriteData.js'
+import { getCharacterSprite, isSittingState } from './characters.js'
 import { renderMatrixEffect } from './matrixEffect.js'
 import { getColorizedFloorSprite, hasFloorSprites, WALL_COLOR } from '../floorTiles.js'
 import { hasWallSprites, getWallInstances, wallColorToHex } from '../wallTiles.js'
@@ -39,6 +39,8 @@ import {
   DELETE_BUTTON_BG,
   ROTATE_BUTTON_BG,
   DETACHED_CHARACTER_ALPHA,
+  EMOTE_VERTICAL_OFFSET_PX,
+  EMOTE_FADE_DURATION_SEC,
 } from '../../constants.js'
 
 // ── 渲染函式 ────────────────────────────────────────────
@@ -126,7 +128,7 @@ export function renderScene(
     const spriteData = getCharacterSprite(ch, sprites)
     const cached = getCachedSprite(spriteData, zoom)
     // 坐姿偏移：角色坐下時向下移動，使其視覺上坐在椅子上
-    const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0
+    const sittingOffset = isSittingState(ch.state) ? CHARACTER_SITTING_OFFSET_PX : 0
     // 錨點在角色底部中央 — 四捨五入為整數裝置像素
     const drawX = Math.round(offsetX + ch.x * zoom - cached.width / 2)
     const drawY = Math.round(offsetY + (ch.y + sittingOffset) * zoom - cached.height)
@@ -483,13 +485,46 @@ export function renderBubbles(
     // 位置：置中於角色頭部上方
     // 角色錨點在底部中央 (ch.x, ch.y)，精靈圖為 16x24
     // 將氣泡放在頭部上方並留有小間距；跟隨坐姿偏移
-    const sittingOff = ch.state === CharacterState.TYPE ? BUBBLE_SITTING_OFFSET_PX : 0
+    const sittingOff = isSittingState(ch.state) ? BUBBLE_SITTING_OFFSET_PX : 0
     const bubbleX = Math.round(offsetX + ch.x * zoom - cached.width / 2)
     const bubbleY = Math.round(offsetY + (ch.y + sittingOff - BUBBLE_VERTICAL_OFFSET_PX) * zoom - cached.height - 1 * zoom)
 
     ctx.save()
     if (alpha < 1.0) ctx.globalAlpha = alpha
     ctx.drawImage(cached, bubbleX, bubbleY)
+    ctx.restore()
+  }
+}
+
+// ── 表情圖標 ──────────────────────────────────────────────
+
+export function renderEmotes(
+  ctx: CanvasRenderingContext2D,
+  characters: Character[],
+  offsetX: number,
+  offsetY: number,
+  zoom: number,
+): void {
+  for (const ch of characters) {
+    if (!ch.emoteType) continue
+
+    const sprite = getEmoteSprite(ch.emoteType)
+    const cached = getCachedSprite(sprite, zoom)
+
+    // 淡出效果：最後 EMOTE_FADE_DURATION_SEC 秒逐漸消失
+    let alpha = 1.0
+    if (ch.emoteTimer < EMOTE_FADE_DURATION_SEC) {
+      alpha = ch.emoteTimer / EMOTE_FADE_DURATION_SEC
+    }
+
+    // 位置：角色頭部右上方（不與氣泡重疊）
+    const sittingOff = isSittingState(ch.state) ? CHARACTER_SITTING_OFFSET_PX : 0
+    const emoteX = Math.round(offsetX + (ch.x + 4) * zoom)
+    const emoteY = Math.round(offsetY + (ch.y + sittingOff - EMOTE_VERTICAL_OFFSET_PX) * zoom - cached.height)
+
+    ctx.save()
+    if (alpha < 1.0) ctx.globalAlpha = alpha
+    ctx.drawImage(cached, emoteX, emoteY)
     ctx.restore()
   }
 }
@@ -590,6 +625,9 @@ export function renderFrame(
 
   // 對話氣泡（始終在角色上方）
   renderBubbles(ctx, characters, offsetX, offsetY, zoom)
+
+  // 表情圖標（在氣泡旁邊）
+  renderEmotes(ctx, characters, offsetX, offsetY, zoom)
 
   // 編輯器覆蓋層
   if (editor) {
