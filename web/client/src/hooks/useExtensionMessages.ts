@@ -58,6 +58,10 @@ export interface ExtensionMessageState {
   agentProjects: Record<number, string>
   /** agentId → 轉錄記錄陣列 */
   agentTranscripts: Record<number, TranscriptEntry[]>
+  /** 被排除的專案目錄 basename 清單 */
+  excludedProjects: string[]
+  /** ~/.claude/projects/ 下所有專案目錄（含排除狀態） */
+  projectDirs: { name: string; excluded: boolean }[]
 }
 
 /** 轉錄記錄條目 */
@@ -95,6 +99,8 @@ interface HandlerContext {
   setLoadedAssets: React.Dispatch<React.SetStateAction<{ catalog: FurnitureAsset[]; sprites: Record<string, string[][]> } | undefined>>
   setAgentProjects: React.Dispatch<React.SetStateAction<Record<number, string>>>
   setAgentTranscripts: React.Dispatch<React.SetStateAction<Record<number, TranscriptEntry[]>>>
+  setExcludedProjects: React.Dispatch<React.SetStateAction<string[]>>
+  setProjectDirs: React.Dispatch<React.SetStateAction<{ name: string; excluded: boolean }[]>>
 }
 
 // ── Message Handlers ───────────────────────────────────────────
@@ -392,6 +398,14 @@ function handleProjectNameUpdated(msg: ServerMessage & { type: 'projectNameUpdat
   ctx.setAgentProjects((prev) => ({ ...prev, ...msg.updates }))
 }
 
+function handleExcludedProjectsUpdated(msg: ServerMessage & { type: 'excludedProjectsUpdated' }, ctx: HandlerContext): void {
+  ctx.setExcludedProjects(msg.excluded)
+}
+
+function handleProjectDirsList(msg: ServerMessage & { type: 'projectDirsList' }, ctx: HandlerContext): void {
+  ctx.setProjectDirs(msg.dirs)
+}
+
 // ── Handler 查找表 ──────────────────────────────────────────────
 
 type HandlerFn = (msg: never, ctx: HandlerContext) => void
@@ -423,6 +437,8 @@ const messageHandlers: Record<string, HandlerFn> = {
   furnitureAssetsLoaded: handleFurnitureAssetsLoaded as HandlerFn,
   agentTranscript: handleAgentTranscript as HandlerFn,
   projectNameUpdated: handleProjectNameUpdated as HandlerFn,
+  excludedProjectsUpdated: handleExcludedProjectsUpdated as HandlerFn,
+  projectDirsList: handleProjectDirsList as HandlerFn,
 }
 
 // ── Hook ────────────────────────────────────────────────────────
@@ -443,6 +459,8 @@ export function useExtensionMessages(
   const [loadedAssets, setLoadedAssets] = useState<{ catalog: FurnitureAsset[]; sprites: Record<string, string[][]> } | undefined>()
   const [agentProjects, setAgentProjects] = useState<Record<number, string>>({})
   const [agentTranscripts, setAgentTranscripts] = useState<Record<number, TranscriptEntry[]>>({})
+  const [excludedProjects, setExcludedProjects] = useState<string[]>([])
+  const [projectDirs, setProjectDirs] = useState<{ name: string; excluded: boolean }[]>([])
 
   const layoutReadyRef = useRef(false)
   const pendingAgentsRef = useRef<Array<{ id: number; palette?: number; hueShift?: number; seatId?: string }>>([])
@@ -465,6 +483,8 @@ export function useExtensionMessages(
       setLoadedAssets,
       setAgentProjects,
       setAgentTranscripts,
+      setExcludedProjects,
+      setProjectDirs,
     }
 
     const handler = (data: unknown) => {
@@ -480,5 +500,5 @@ export function useExtensionMessages(
     return unsub
   }, [getOfficeState])
 
-  return { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, agentTranscripts }
+  return { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, agentTranscripts, excludedProjects, projectDirs }
 }

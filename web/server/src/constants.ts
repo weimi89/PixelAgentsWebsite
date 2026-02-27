@@ -32,6 +32,7 @@ export const SETTINGS_FILE_NAME = 'settings.json';
 export const AGENTS_FILE_NAME = 'agents.json';
 export const AGENT_SEATS_FILE_NAME = 'agent-seats.json';
 export const PROJECT_NAMES_FILE_NAME = 'project-names.json';
+export const EXCLUDED_PROJECTS_FILE_NAME = 'excluded-projects.json';
 
 // ── 自動偵測 ──────────────────────────────────────────
 export const ACTIVE_JSONL_MAX_AGE_MS = 30_000; // 30 秒 — 在此時間窗口內被修改的檔案視為「活躍」

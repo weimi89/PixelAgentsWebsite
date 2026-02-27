@@ -7,6 +7,7 @@ import {
 	SESSION_SCAN_READ_BYTES,
 	MAX_SESSIONS_DISPLAY,
 } from './constants.js';
+import { isProjectExcluded } from './projectNameStore.js';
 
 export interface SessionInfo {
 	sessionId: string;
@@ -38,6 +39,7 @@ export function scanAllSessions(
 	for (const dirEntry of dirs) {
 		if (!dirEntry.isDirectory()) continue;
 		const dirPath = path.join(projectsRoot, dirEntry.name);
+		if (isProjectExcluded(dirPath)) continue;
 
 		let files: string[];
 		try {

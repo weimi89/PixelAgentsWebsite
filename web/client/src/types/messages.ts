@@ -54,3 +54,5 @@ export type ServerMessage =
   | { type: 'agentTranscript'; id: number; log: TranscriptEntry[] }
   | { type: 'exportLayoutData'; layout: OfficeLayout }
   | { type: 'projectNameUpdated'; updates: Record<number, string> }
+  | { type: 'excludedProjectsUpdated'; excluded: string[] }
+  | { type: 'projectDirsList'; dirs: { name: string; excluded: boolean }[] }

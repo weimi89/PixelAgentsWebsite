@@ -52,7 +52,10 @@ export type ClientMessage =
 	| { type: 'listSessions' }
 	| { type: 'resumeSession'; sessionId: string; projectDir: string }
 	| { type: 'requestExportLayout' }
-	| { type: 'setProjectName'; agentId: number; name: string };
+	| { type: 'setProjectName'; agentId: number; name: string }
+	| { type: 'excludeProject'; projectDir: string }
+	| { type: 'includeProject'; projectDir: string }
+	| { type: 'listProjectDirs' };
 
 /** 代理上下文 — 集中管理所有共享狀態與計時器，避免函式傳遞大量參數 */
 export interface AgentContext {

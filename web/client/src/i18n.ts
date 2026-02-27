@@ -86,6 +86,14 @@ export const t = {
   searchSessions: '搜尋工作階段...',
   noMatchingSessions: '沒有符合的工作階段',
 
+  // 專案排除
+  hideProject: '隱藏',
+  showProject: '顯示',
+  excludedProjects: '已隱藏的專案',
+  noExcludedProjects: '無隱藏的專案',
+  projectFolders: '專案資料夾',
+  projectFoldersCount: (n: number) => `專案資料夾 (${n})`,
+
   // 連線狀態
   disconnected: '已斷線，重連中...',
 

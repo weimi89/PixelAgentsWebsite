@@ -125,7 +125,7 @@ function App() {
 
   const isEditDirty = useCallback(() => editor.isEditMode && editor.isDirty, [editor.isEditMode, editor.isDirty])
 
-  const { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, agentTranscripts } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
+  const { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, agentTranscripts, projectDirs } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
 
   const [isDebugMode, setIsDebugMode] = useState(false)
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false)
@@ -143,11 +143,26 @@ function App() {
     setIsSessionPickerOpen(true)
     setIsLoadingSessions(true)
     vscode.postMessage({ type: 'listSessions' })
+    vscode.postMessage({ type: 'listProjectDirs' })
   }, [])
 
   const handleResumeSession = useCallback((sessionId: string, projectDir: string) => {
     vscode.postMessage({ type: 'resumeSession', sessionId, projectDir })
     setIsSessionPickerOpen(false)
+  }, [])
+
+  const handleExcludeProject = useCallback((dirBasename: string) => {
+    vscode.postMessage({ type: 'excludeProject', projectDir: dirBasename })
+    // 重新獲取 sessions 和目錄清單以反映排除
+    vscode.postMessage({ type: 'listSessions' })
+    vscode.postMessage({ type: 'listProjectDirs' })
+  }, [])
+
+  const handleIncludeProject = useCallback((dirBasename: string) => {
+    vscode.postMessage({ type: 'includeProject', projectDir: dirBasename })
+    // 重新獲取 sessions 和目錄清單以反映恢復
+    vscode.postMessage({ type: 'listSessions' })
+    vscode.postMessage({ type: 'listProjectDirs' })
   }, [])
 
   useEffect(() => {
@@ -315,6 +330,9 @@ function App() {
         sessions={sessions}
         onResume={handleResumeSession}
         isLoading={isLoadingSessions}
+        projectDirs={projectDirs}
+        onExcludeProject={handleExcludeProject}
+        onIncludeProject={handleIncludeProject}
       />
 
       {editor.isEditMode && editor.isDirty && (

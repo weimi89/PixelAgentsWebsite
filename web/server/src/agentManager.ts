@@ -6,7 +6,7 @@ import type { AgentContext, AgentState, PersistedAgent, MessageSender } from './
 import { cancelWaitingTimer, cancelPermissionTimer } from './timerManager.js';
 import { startFileWatching, readNewLines } from './fileWatcher.js';
 import { JSONL_POLL_INTERVAL_MS, JSONL_POLL_TIMEOUT_MS, LAYOUT_FILE_DIR, AGENTS_FILE_NAME, IGNORED_PROJECT_DIR_PATTERNS } from './constants.js';
-import { getCustomName } from './projectNameStore.js';
+import { getCustomName, isProjectExcluded } from './projectNameStore.js';
 import {
 	isTmuxAvailable,
 	tmuxSessionName as buildTmuxName,
@@ -49,7 +49,8 @@ export function getAllProjectDirs(): string[] {
 		return entries
 			.filter(e => e.isDirectory())
 			.filter(e => !IGNORED_PROJECT_DIR_PATTERNS.some(p => e.name.includes(p)))
-			.map(e => path.join(projectsRoot, e.name));
+			.map(e => path.join(projectsRoot, e.name))
+			.filter(dir => !isProjectExcluded(dir));
 	} catch {
 		return [];
 	}

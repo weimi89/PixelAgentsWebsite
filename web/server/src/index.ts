@@ -18,8 +18,8 @@ import {
 } from './assetLoader.js';
 import type { LoadedAssets, LoadedFloorTiles, LoadedWallTiles, LoadedCharacterSprites } from './assetLoader.js';
 import { writeLayoutToFile, loadLayout } from './layoutPersistence.js';
-import { launchNewAgent, closeAgent, sendExistingAgents, getAllProjectDirs, getProjectDirPath, resumeSession, recoverTmuxAgents, checkTmuxHealth, savePersistedAgents } from './agentManager.js';
-import { setCustomName } from './projectNameStore.js';
+import { launchNewAgent, closeAgent, removeAgent, sendExistingAgents, getAllProjectDirs, getProjectDirPath, resumeSession, recoverTmuxAgents, checkTmuxHealth, savePersistedAgents } from './agentManager.js';
+import { setCustomName, addExcludedProject, removeExcludedProject, readExcludedProjects } from './projectNameStore.js';
 import { scanAllSessions } from './sessionScanner.js';
 import { ensureProjectScan } from './fileWatcher.js';
 import {
@@ -340,6 +340,9 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender): void {
 			);
 			sendExistingAgents(agents, agentMeta, sender, ownProjectDir);
 
+			// 傳送排除專案清單
+			sender.postMessage({ type: 'excludedProjectsUpdated', excluded: readExcludedProjects() });
+
 			// 演示模式或真實的自動偵測
 			if (isDemoEnabled()) {
 				const demoCount = parseInt(process.env['DEMO_AGENTS'] || '3', 10);
@@ -416,6 +419,46 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender): void {
 			}
 			// 廣播給所有客戶端
 			ctx.sender?.postMessage({ type: 'projectNameUpdated', updates });
+			break;
+		}
+		case 'excludeProject': {
+			addExcludedProject(msg.projectDir);
+			// 以 basename 比對，收集該專案下所有自動收養的代理 ID（process=null 且非 tmux）
+			const excludeKey = path.basename(msg.projectDir);
+			const toRemove: number[] = [];
+			for (const [agentId, agent] of agents) {
+				if (path.basename(agent.projectDir) === excludeKey && agent.process === null && !agent.tmuxSessionName) {
+					toRemove.push(agentId);
+				}
+			}
+			for (const agentId of toRemove) {
+				removeAgent(agentId, ctx);
+				ctx.sender?.postMessage({ type: 'agentClosed', id: agentId });
+			}
+			ctx.sender?.postMessage({ type: 'excludedProjectsUpdated', excluded: readExcludedProjects() });
+			break;
+		}
+		case 'includeProject': {
+			removeExcludedProject(msg.projectDir);
+			// 立即重新掃描一次
+			const projectDirs = getAllProjectDirs();
+			ensureProjectScan(projectDirs, projectScanTimerRef, ctx);
+			ctx.sender?.postMessage({ type: 'excludedProjectsUpdated', excluded: readExcludedProjects() });
+			break;
+		}
+		case 'listProjectDirs': {
+			const projectsRoot = path.join(os.homedir(), '.claude', 'projects');
+			const excluded = readExcludedProjects();
+			const dirs: { name: string; excluded: boolean }[] = [];
+			try {
+				const entries = fs.readdirSync(projectsRoot, { withFileTypes: true });
+				for (const entry of entries) {
+					if (!entry.isDirectory()) continue;
+					dirs.push({ name: entry.name, excluded: excluded.includes(entry.name) });
+				}
+			} catch { /* 目錄不存在則回傳空陣列 */ }
+			dirs.sort((a, b) => a.name.localeCompare(b.name));
+			sender.postMessage({ type: 'projectDirsList', dirs });
 			break;
 		}
 	}

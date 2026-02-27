@@ -11,12 +11,20 @@ export interface SessionInfo {
   isActive: boolean
 }
 
+export interface ProjectDirInfo {
+  name: string
+  excluded: boolean
+}
+
 interface SessionPickerProps {
   isOpen: boolean
   onClose: () => void
   sessions: SessionInfo[]
   onResume: (sessionId: string, projectDir: string) => void
   isLoading: boolean
+  projectDirs: ProjectDirInfo[]
+  onExcludeProject: (dirBasename: string) => void
+  onIncludeProject: (dirBasename: string) => void
 }
 
 function formatTimeAgo(ms: number): string {
@@ -40,13 +48,17 @@ function formatSize(bytes: number): string {
   return `${mb.toFixed(1)} MB`
 }
 
-export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }: SessionPickerProps) {
+export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading, projectDirs, onExcludeProject, onIncludeProject }: SessionPickerProps) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showProjectDirs, setShowProjectDirs] = useState(false)
 
   // 開關時重設搜尋
   useEffect(() => {
-    if (!isOpen) setSearchQuery('')
+    if (!isOpen) {
+      setSearchQuery('')
+      setShowProjectDirs(false)
+    }
   }, [isOpen])
 
   // Escape 鍵關閉
@@ -193,7 +205,7 @@ export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }
           ) : (
             filteredSessions.map((session) => {
               const key = session.sessionId
-              const isHovered = hovered === key
+              const isItemHovered = hovered === key
               return (
                 <div
                   key={key}
@@ -209,7 +221,7 @@ export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }
                   }}
                   style={{
                     padding: '8px 10px',
-                    background: isHovered ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
+                    background: isItemHovered ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
                     cursor: session.isActive ? 'default' : 'pointer',
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                     opacity: session.isActive ? 0.5 : 1,
@@ -269,6 +281,102 @@ export function SessionPicker({ isOpen, onClose, sessions, onResume, isLoading }
             })
           )}
         </div>
+
+        {/* 專案資料夾管理區 */}
+        {projectDirs.length > 0 && (
+          <div style={{ flexShrink: 0, borderTop: '1px solid var(--pixel-border)', padding: '4px 8px' }}>
+            <button
+              onClick={() => setShowProjectDirs((prev) => !prev)}
+              onMouseEnter={() => setHovered('dirs-toggle')}
+              onMouseLeave={() => setHovered(null)}
+              style={{
+                background: hovered === 'dirs-toggle' ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
+                border: 'none',
+                color: 'rgba(255, 255, 255, 0.5)',
+                fontSize: '16px',
+                cursor: 'pointer',
+                padding: '4px 2px',
+                width: '100%',
+                textAlign: 'left',
+              }}
+            >
+              {showProjectDirs ? '▾' : '▸'} {t.projectFoldersCount(projectDirs.length)}
+            </button>
+            {showProjectDirs && (
+              <div style={{ padding: '4px 0', maxHeight: '200px', overflowY: 'auto' }}>
+                {projectDirs.map((dir) => {
+                  const dirHoverKey = `dir-${dir.name}`
+                  return (
+                    <div
+                      key={dir.name}
+                      onMouseEnter={() => setHovered(dirHoverKey)}
+                      onMouseLeave={() => setHovered(null)}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '3px 8px',
+                        background: hovered === dirHoverKey ? 'rgba(255, 255, 255, 0.04)' : 'transparent',
+                        opacity: dir.excluded ? 0.5 : 1,
+                      }}
+                    >
+                      <span style={{
+                        fontSize: '14px',
+                        color: dir.excluded ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.7)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        flex: 1,
+                        marginRight: '8px',
+                        textDecoration: dir.excluded ? 'line-through' : 'none',
+                      }}>
+                        {dir.name}
+                      </span>
+                      {dir.excluded ? (
+                        <button
+                          onClick={() => onIncludeProject(dir.name)}
+                          onMouseEnter={() => setHovered(`dir-btn-${dir.name}`)}
+                          onMouseLeave={() => setHovered(dirHoverKey)}
+                          style={{
+                            background: hovered === `dir-btn-${dir.name}` ? 'rgba(80, 200, 120, 0.15)' : 'transparent',
+                            border: '1px solid rgba(80, 200, 120, 0.4)',
+                            color: 'rgba(80, 200, 120, 0.9)',
+                            fontSize: '14px',
+                            cursor: 'pointer',
+                            padding: '0 6px',
+                            borderRadius: 0,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {t.showProject}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => onExcludeProject(dir.name)}
+                          onMouseEnter={() => setHovered(`dir-btn-${dir.name}`)}
+                          onMouseLeave={() => setHovered(dirHoverKey)}
+                          style={{
+                            background: hovered === `dir-btn-${dir.name}` ? 'rgba(255, 100, 100, 0.12)' : 'transparent',
+                            border: '1px solid',
+                            borderColor: hovered === `dir-btn-${dir.name}` ? 'rgba(255, 100, 100, 0.5)' : 'rgba(255, 255, 255, 0.15)',
+                            color: hovered === `dir-btn-${dir.name}` ? 'rgba(255, 100, 100, 0.9)' : 'rgba(255, 255, 255, 0.4)',
+                            fontSize: '14px',
+                            cursor: 'pointer',
+                            padding: '0 6px',
+                            borderRadius: 0,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {t.hideProject}
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </>
   )
