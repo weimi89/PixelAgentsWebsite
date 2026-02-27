@@ -1,5 +1,6 @@
 // ── 計時（毫秒）──────────────────────────────────────────────
 export const JSONL_POLL_INTERVAL_MS = 1000;
+export const JSONL_POLL_TIMEOUT_MS = 30_000; // 30 秒 — JSONL 輪詢最大等待時間
 export const FILE_WATCHER_POLL_INTERVAL_MS = 2000;
 export const PROJECT_SCAN_INTERVAL_MS = 1000;
 export const TOOL_DONE_DELAY_MS = 300;
@@ -47,3 +48,4 @@ export const TMUX_HEALTH_CHECK_INTERVAL_MS = 5000;
 
 // ── 伺服器 ──────────────────────────────────────────────────
 export const DEFAULT_PORT = 3000;
+export const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 5000; // 強制退出前的寬限時間

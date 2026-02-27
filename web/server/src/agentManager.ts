@@ -5,7 +5,7 @@ import { spawn, execSync } from 'child_process';
 import type { AgentContext, AgentState, PersistedAgent, MessageSender } from './types.js';
 import { cancelWaitingTimer, cancelPermissionTimer } from './timerManager.js';
 import { startFileWatching, readNewLines } from './fileWatcher.js';
-import { JSONL_POLL_INTERVAL_MS, LAYOUT_FILE_DIR, AGENTS_FILE_NAME, IGNORED_PROJECT_DIR_PATTERNS } from './constants.js';
+import { JSONL_POLL_INTERVAL_MS, JSONL_POLL_TIMEOUT_MS, LAYOUT_FILE_DIR, AGENTS_FILE_NAME, IGNORED_PROJECT_DIR_PATTERNS } from './constants.js';
 import {
 	isTmuxAvailable,
 	tmuxSessionName as buildTmuxName,
@@ -203,6 +203,12 @@ function spawnClaudeAgent(
 
 		agent.process = proc;
 
+		proc.on('error', (err) => {
+			console.error(`[Pixel Agents] Agent ${id}: process error:`, err);
+			removeAgent(id, ctx);
+			sender?.postMessage({ type: 'agentClosed', id });
+		});
+
 		proc.on('exit', (code) => {
 			console.log(`[Pixel Agents] Agent ${id}: process exited with code ${code}`);
 			removeAgent(id, ctx);
@@ -223,7 +229,8 @@ function spawnClaudeAgent(
 		...(isExternal ? { isExternal: true } : {}),
 	});
 
-	// 輪詢等待 JSONL 檔案出現後開始檔案監視
+	// 輪詢等待 JSONL 檔案出現後開始檔案監視（含超時防護）
+	const pollStartTime = Date.now();
 	const pollTimer = setInterval(() => {
 		try {
 			if (fs.existsSync(agent.jsonlFile)) {
@@ -232,8 +239,19 @@ function spawnClaudeAgent(
 				jsonlPollTimers.delete(id);
 				startFileWatching(id, agent.jsonlFile, ctx);
 				readNewLines(id, ctx);
+				return;
 			}
 		} catch { /* 檔案可能尚不存在 */ }
+		if (Date.now() - pollStartTime > JSONL_POLL_TIMEOUT_MS) {
+			console.warn(`[Pixel Agents] Agent ${id}: JSONL file not found after ${JSONL_POLL_TIMEOUT_MS / 1000}s, removing`);
+			clearInterval(pollTimer);
+			jsonlPollTimers.delete(id);
+			if (agent.tmuxSessionName) {
+				killTmuxSession(agent.tmuxSessionName);
+			}
+			removeAgent(id, ctx);
+			sender?.postMessage({ type: 'agentClosed', id });
+		}
 	}, JSONL_POLL_INTERVAL_MS);
 	jsonlPollTimers.set(id, pollTimer);
 }

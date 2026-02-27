@@ -27,6 +27,7 @@ import {
 	SETTINGS_FILE_NAME,
 	AGENT_SEATS_FILE_NAME,
 	TMUX_HEALTH_CHECK_INTERVAL_MS,
+	GRACEFUL_SHUTDOWN_TIMEOUT_MS,
 } from './constants.js';
 import { isDemoEnabled, startDemoMode, stopDemoMode } from './demoMode.js';
 
@@ -193,21 +194,26 @@ async function main(): Promise<void> {
 		app.use(express.static(clientDistPath));
 	}
 
+	// 廣播 sender — 所有伺服器主動推送（agentCreated/Closed、agentToolStart/Done 等）走這裡
+	ctx.sender = {
+		postMessage(msg: unknown) {
+			io.emit('message', msg);
+		},
+	};
+
 	// Socket.IO 連線處理器
 	io.on('connection', (socket) => {
 		console.log(`[Pixel Agents] Client connected: ${socket.id}`);
 
-		const sender: MessageSender = {
+		// 單播 sender — 用於對請求者的直接回覆（webviewReady 素材/佈局等）
+		const directSender: MessageSender = {
 			postMessage(msg: unknown) {
 				socket.emit('message', msg);
 			},
 		};
 
-		// 更新 context 中的 sender
-		ctx.sender = sender;
-
 		socket.on('message', (msg: Record<string, unknown>) => {
-			handleClientMessage(msg, sender);
+			handleClientMessage(msg, directSender);
 		});
 
 		socket.on('disconnect', () => {
@@ -221,6 +227,67 @@ async function main(): Promise<void> {
 	httpServer.listen(port, () => {
 		console.log(`\n  Pixel Agents Web running at http://localhost:${port}\n`);
 	});
+
+	setupGracefulShutdown(httpServer, io);
+}
+
+function setupGracefulShutdown(
+	httpServer: ReturnType<typeof createServer>,
+	io: Server,
+): void {
+	let shuttingDown = false;
+	function shutdown(signal: string): void {
+		if (shuttingDown) return;
+		shuttingDown = true;
+		console.log(`\n[Pixel Agents] ${signal} received, shutting down...`);
+
+		// 全域計時器
+		if (projectScanTimerRef.current) {
+			clearInterval(projectScanTimerRef.current);
+			projectScanTimerRef.current = null;
+		}
+		if (tmuxHealthTimer) {
+			clearInterval(tmuxHealthTimer);
+			tmuxHealthTimer = null;
+		}
+		if (isDemoEnabled()) stopDemoMode();
+
+		// 代理資源（不終止 tmux — 保留供下次恢復）
+		for (const [agentId, agent] of agents) {
+			const jp = jsonlPollTimers.get(agentId);
+			if (jp) clearInterval(jp);
+			fileWatchers.get(agentId)?.close();
+			const pt = pollingTimers.get(agentId);
+			if (pt) clearInterval(pt);
+			const wt = waitingTimers.get(agentId);
+			if (wt) clearTimeout(wt);
+			const pm = permissionTimers.get(agentId);
+			if (pm) clearTimeout(pm);
+			if (agent.process && !agent.process.killed) {
+				agent.process.kill('SIGTERM');
+			}
+		}
+		jsonlPollTimers.clear();
+		fileWatchers.clear();
+		pollingTimers.clear();
+		waitingTimers.clear();
+		permissionTimers.clear();
+
+		persistAgents();
+
+		io.close(() => {
+			httpServer.close(() => {
+				console.log('[Pixel Agents] Shutdown complete.');
+				process.exit(0);
+			});
+		});
+		setTimeout(() => {
+			console.warn('[Pixel Agents] Forced shutdown after timeout');
+			process.exit(1);
+		}, GRACEFUL_SHUTDOWN_TIMEOUT_MS).unref();
+	}
+	process.on('SIGINT', () => shutdown('SIGINT'));
+	process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
 function handleClientMessage(msg: Record<string, unknown>, sender: MessageSender): void {
