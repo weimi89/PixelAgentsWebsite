@@ -1,9 +1,31 @@
+# Dependencies
+node_modules
+
+# Build output
 out
 dist
-node_modules
+
+# VS Code extension
 .vscode-test/
 *.vsix
-.claude/
-/logs
-/sprites-export
+
+# Environment
 .env
+
+# Logs
+/logs
+
+# macOS
+.DS_Store
+
+# Project-specific
+/sprites-export
+# Backups
+backups/
+
+# Dev notes
+doc/dev-notes/
+
+# Tools
+.claude/
+.serena/
