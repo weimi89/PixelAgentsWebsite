@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, memo } from 'react'
+import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import type { ToolActivity } from '../office/types.js'
 import { extractToolName } from '../office/toolUtils.js'
 import { TOOL_TYPE_COLORS } from '../constants.js'
@@ -197,6 +197,10 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
     setTimeout(onClose, 200)
   }, [onClose])
 
+  // 自動捲動到底部（新項目出現時）
+  const toolsScrollRef = useRef<HTMLDivElement>(null)
+  const historyScrollRef = useRef<HTMLDivElement>(null)
+
   const agent = agents[agentId]
   const status = agentStatuses[agentId]
   const tools = agentTools[agentId] || []
@@ -204,6 +208,22 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
   const branch = agentGitBranches[agentId]
   const history = agentStatusHistory[agentId] || []
   const { text: statusText, color: statusColor } = statusDisplay(status)
+
+  // 工具活動自動捲動到底部
+  useEffect(() => {
+    const el = toolsScrollRef.current
+    if (!el) return
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+    if (isNearBottom) el.scrollTop = el.scrollHeight
+  }, [tools.length])
+
+  // 狀態歷史自動捲動到底部
+  useEffect(() => {
+    const el = historyScrollRef.current
+    if (!el) return
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+    if (isNearBottom) el.scrollTop = el.scrollHeight
+  }, [history.length])
 
   return (
     <div
@@ -285,7 +305,7 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
         )}
       </div>
 
-      <div style={scrollAreaStyle}>
+      <div ref={toolsScrollRef} style={scrollAreaStyle}>
         {tools.length === 0 ? (
           <div style={{ padding: '6px 10px', fontSize: '18px', color: 'rgba(255,255,255,0.3)' }}>
             {t.noToolData}
@@ -334,15 +354,15 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
         )}
       </div>
 
-      <div style={scrollAreaStyle}>
+      <div ref={historyScrollRef} style={scrollAreaStyle}>
         {history.length === 0 ? (
           <div style={{ padding: '6px 10px', fontSize: '18px', color: 'rgba(255,255,255,0.3)' }}>
             {t.noHistory}
           </div>
         ) : (
           <div style={{ padding: '4px 10px' }}>
-            {/* 由新到舊顯示，最新的在上方 */}
-            {[...history].reverse().map((entry, i) => {
+            {/* 時間順序：舊→新，自動捲動到底部 */}
+            {history.map((entry, i) => {
               const { color: dotColor } = statusDisplay(entry.status)
               return (
                 <div
