@@ -85,18 +85,19 @@ export const ZOOM_LEVEL_FADE_DURATION_SEC = 0.5
 export const ZOOM_SCROLL_THRESHOLD = 50
 export const PAN_MARGIN_FRACTION = 0.25
 
-// ── 迷你地圖 ────────────────────────────────────────────────
+// ── 迷你地圖（尺寸為 CSS 像素，渲染時乘以 DPR）────────────
 export const MINIMAP_MARGIN = 10
+export const MINIMAP_MARGIN_BOTTOM = 90      // 避開聊天面板 + 底部工具列
 export const MINIMAP_BG_ALPHA = 0.85
 export const MINIMAP_MIN_SIZE = 80
 export const MINIMAP_MAX_SIZE = 160
 export const MINIMAP_TILE_MIN_PX = 3
 export const MINIMAP_DOT_SIZE = 3
-export const MINIMAP_VIEWPORT_STROKE = 'rgba(255,255,255,0.7)'
-export const MINIMAP_BG_COLOR = 'rgba(15,15,25,0.85)'
-export const MINIMAP_FLOOR_COLOR = '#3a3a52'
-export const MINIMAP_WALL_COLOR = '#5a5a72'
-export const MINIMAP_FURNITURE_COLOR = '#4a4a5e'
+export const MINIMAP_VIEWPORT_STROKE = 'rgba(255,255,255,0.85)'
+export const MINIMAP_BG_COLOR = 'rgba(10,10,18,0.92)'
+export const MINIMAP_FLOOR_COLOR = '#6b6b5a'
+export const MINIMAP_WALL_COLOR = '#9898a8'
+export const MINIMAP_FURNITURE_COLOR = '#7a7068'
 
 // ── 編輯器 ──────────────────────────────────────────────────
 export const UNDO_STACK_MAX_SIZE = 50

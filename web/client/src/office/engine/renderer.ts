@@ -8,6 +8,7 @@ import { getColorizedFloorSprite, hasFloorSprites, WALL_COLOR } from '../floorTi
 import { hasWallSprites, getWallInstances, wallColorToHex } from '../wallTiles.js'
 import {
   MINIMAP_MARGIN,
+  MINIMAP_MARGIN_BOTTOM,
   MINIMAP_MIN_SIZE,
   MINIMAP_MAX_SIZE,
   MINIMAP_TILE_MIN_PX,
@@ -823,36 +824,44 @@ export function renderMinimap(
   offsetY: number,
   layoutCols: number,
   layoutRows: number,
+  dpr: number,
 ): MinimapBounds | null {
   if (layoutCols === 0 || layoutRows === 0) return null
+
+  // 常數以 CSS 像素定義，乘以 DPR 得到設備像素
+  const maxSize = MINIMAP_MAX_SIZE * dpr
+  const minSize = MINIMAP_MIN_SIZE * dpr
+  const tileMinPx = MINIMAP_TILE_MIN_PX * dpr
 
   // 計算 minimap 尺寸：適配地圖比例，限制在 MIN-MAX 範圍
   const aspect = layoutCols / layoutRows
   let mmW: number
   let mmH: number
-  const tilePx = Math.max(MINIMAP_TILE_MIN_PX, Math.floor(MINIMAP_MAX_SIZE / Math.max(layoutCols, layoutRows)))
+  const tilePx = Math.max(tileMinPx, Math.floor(maxSize / Math.max(layoutCols, layoutRows)))
   mmW = layoutCols * tilePx
   mmH = layoutRows * tilePx
-  if (mmW > MINIMAP_MAX_SIZE) { mmW = MINIMAP_MAX_SIZE; mmH = mmW / aspect }
-  if (mmH > MINIMAP_MAX_SIZE) { mmH = MINIMAP_MAX_SIZE; mmW = mmH * aspect }
-  if (mmW < MINIMAP_MIN_SIZE && mmH < MINIMAP_MIN_SIZE) {
-    if (aspect >= 1) { mmW = MINIMAP_MIN_SIZE; mmH = mmW / aspect }
-    else { mmH = MINIMAP_MIN_SIZE; mmW = mmH * aspect }
+  if (mmW > maxSize) { mmW = maxSize; mmH = mmW / aspect }
+  if (mmH > maxSize) { mmH = maxSize; mmW = mmH * aspect }
+  if (mmW < minSize && mmH < minSize) {
+    if (aspect >= 1) { mmW = minSize; mmH = mmW / aspect }
+    else { mmH = minSize; mmW = mmH * aspect }
   }
 
   mmW = Math.round(mmW)
   mmH = Math.round(mmH)
 
-  const margin = MINIMAP_MARGIN
-  const mmX = canvasWidth - mmW - margin
-  const mmY = canvasHeight - mmH - margin
+  const marginRight = MINIMAP_MARGIN * dpr
+  const marginBottom = MINIMAP_MARGIN_BOTTOM * dpr
+  const mmX = canvasWidth - mmW - marginRight
+  const mmY = canvasHeight - mmH - marginBottom
 
   // 背景
+  const border = Math.max(1, Math.round(dpr))
   ctx.fillStyle = MINIMAP_BG_COLOR
-  ctx.fillRect(mmX - 2, mmY - 2, mmW + 4, mmH + 4)
+  ctx.fillRect(mmX - border, mmY - border, mmW + border * 2, mmH + border * 2)
   ctx.strokeStyle = 'rgba(100,100,140,0.5)'
-  ctx.lineWidth = 1
-  ctx.strokeRect(mmX - 2, mmY - 2, mmW + 4, mmH + 4)
+  ctx.lineWidth = border
+  ctx.strokeRect(mmX - border, mmY - border, mmW + border * 2, mmH + border * 2)
 
   // 繪製磚塊
   const tileW = mmW / layoutCols
@@ -883,7 +892,7 @@ export function renderMinimap(
 
   // 繪製角色（彩色圓點）— palette 索引 → 代表色
   const PALETTE_COLORS = ['#4a90d9', '#d94a4a', '#4ad97a', '#d9b44a', '#9b59b6', '#e67e22']
-  const dot = MINIMAP_DOT_SIZE
+  const dot = Math.max(2, Math.round(MINIMAP_DOT_SIZE * dpr))
   for (const ch of characters) {
     if (ch.matrixEffect === 'despawn') continue
     const cx = mmX + (ch.x / TILE_SIZE) * tileW
@@ -906,7 +915,7 @@ export function renderMinimap(
   const vpMmH = (vpHeight / (layoutRows * TILE_SIZE)) * mmH
 
   ctx.strokeStyle = MINIMAP_VIEWPORT_STROKE
-  ctx.lineWidth = 1
+  ctx.lineWidth = Math.max(1, Math.round(dpr))
   ctx.strokeRect(
     Math.max(mmX, vpMmX),
     Math.max(mmY, vpMmY),

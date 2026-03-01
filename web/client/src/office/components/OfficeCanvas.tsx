@@ -259,6 +259,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
 
         // 迷你地圖（非編輯模式時繪製）
         if (!isEditMode) {
+          const currentDpr = window.devicePixelRatio || 1
           minimapBoundsRef.current = renderMinimap(
             ctx, w, h,
             officeState.tileMap,
@@ -268,6 +269,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
             offsetX, offsetY,
             officeState.getLayout().cols,
             officeState.getLayout().rows,
+            currentDpr,
           )
         } else {
           minimapBoundsRef.current = null
