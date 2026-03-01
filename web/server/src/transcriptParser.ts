@@ -68,9 +68,10 @@ export function processTranscriptLine(
 	line: string,
 	ctx: AgentContext,
 ): void {
-	const { agents, waitingTimers, permissionTimers, sender } = ctx;
+	const { agents, waitingTimers, permissionTimers } = ctx;
 	const agent = agents.get(agentId);
 	if (!agent) return;
+	const sender = ctx.floorSender(agent.floorId);
 	try {
 		const record = JSON.parse(line);
 
@@ -228,9 +229,10 @@ function processProgressRecord(
 	record: Record<string, unknown>,
 	ctx: AgentContext,
 ): void {
-	const { agents, permissionTimers, sender } = ctx;
+	const { agents, permissionTimers } = ctx;
 	const agent = agents.get(agentId);
 	if (!agent) return;
+	const sender = ctx.floorSender(agent.floorId);
 
 	const parentToolId = record.parentToolUseID as string | undefined;
 	if (!parentToolId) return;

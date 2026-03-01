@@ -33,6 +33,10 @@ export const AGENTS_FILE_NAME = 'agents.json';
 export const AGENT_SEATS_FILE_NAME = 'agent-seats.json';
 export const PROJECT_NAMES_FILE_NAME = 'project-names.json';
 export const EXCLUDED_PROJECTS_FILE_NAME = 'excluded-projects.json';
+export const BUILDING_FILE_NAME = 'building.json';
+export const FLOOR_LAYOUT_DIR = 'floors';
+export const DEFAULT_FLOOR_ID = '1F';
+export const PROJECT_FLOOR_MAP_FILE_NAME = 'project-floor-map.json';
 
 // ── 自動偵測 ──────────────────────────────────────────
 export const ACTIVE_JSONL_MAX_AGE_MS = 30_000; // 30 秒 — 在此時間窗口內被修改的檔案視為「活躍」

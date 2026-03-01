@@ -1,6 +1,8 @@
 import { useState, memo } from 'react'
 import { SettingsModal } from './SettingsModal.js'
+import { FloorSelector } from './FloorSelector.js'
 import { t } from '../i18n.js'
+import type { FloorConfig } from '../types/messages.js'
 
 interface BottomToolbarProps {
   isEditMode: boolean
@@ -8,6 +10,9 @@ interface BottomToolbarProps {
   onOpenSessionPicker: () => void
   isDebugMode: boolean
   onToggleDebugMode: () => void
+  floors: FloorConfig[]
+  currentFloorId: string | null
+  onSwitchFloor: (floorId: string) => void
 }
 
 const panelStyle: React.CSSProperties = {
@@ -48,6 +53,9 @@ export const BottomToolbar = memo(function BottomToolbar({
   onOpenSessionPicker,
   isDebugMode,
   onToggleDebugMode,
+  floors,
+  currentFloorId,
+  onSwitchFloor,
 }: BottomToolbarProps) {
   const [hovered, setHovered] = useState<string | null>(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -108,6 +116,11 @@ export const BottomToolbar = memo(function BottomToolbar({
           onToggleDebugMode={onToggleDebugMode}
         />
       </div>
+      <FloorSelector
+        floors={floors}
+        currentFloorId={currentFloorId}
+        onSwitchFloor={onSwitchFloor}
+      />
     </div>
   )
 })

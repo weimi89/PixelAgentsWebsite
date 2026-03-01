@@ -8,6 +8,20 @@ import type { OfficeLayout } from '../office/types.js'
 import type { FurnitureAsset, TranscriptEntry } from '../hooks/useExtensionMessages.js'
 import type { SessionInfo } from '../components/SessionPicker.js'
 
+/** 樓層配置 */
+export interface FloorConfig {
+  id: string
+  name: string
+  order: number
+}
+
+/** 建築物配置 */
+export interface BuildingConfig {
+  version: 1
+  defaultFloorId: string
+  floors: FloorConfig[]
+}
+
 /** 代理元資料（恢復既有代理時附帶） */
 interface AgentMeta {
   palette?: number
@@ -15,6 +29,7 @@ interface AgentMeta {
   seatId?: string
   isExternal?: boolean
   projectName?: string
+  floorId?: string
 }
 
 /** 角色精靈圖方向資料 */
@@ -27,7 +42,7 @@ interface CharacterSpriteDirections {
 /** 伺服器 → 客戶端訊息的 discriminated union */
 export type ServerMessage =
   | { type: 'layoutLoaded'; layout: OfficeLayout | null }
-  | { type: 'agentCreated'; id: number; isExternal?: boolean; projectName?: string }
+  | { type: 'agentCreated'; id: number; isExternal?: boolean; projectName?: string; floorId?: string }
   | { type: 'agentClosed'; id: number }
   | { type: 'existingAgents'; agents: number[]; agentMeta?: Record<number, AgentMeta> }
   | { type: 'agentToolStart'; id: number; toolId: string; status: string }
@@ -56,3 +71,5 @@ export type ServerMessage =
   | { type: 'projectNameUpdated'; updates: Record<number, string> }
   | { type: 'excludedProjectsUpdated'; excluded: string[] }
   | { type: 'projectDirsList'; dirs: { name: string; excluded: boolean }[] }
+  | { type: 'buildingConfig'; building: BuildingConfig }
+  | { type: 'floorSwitched'; floorId: string }

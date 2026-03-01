@@ -4,7 +4,8 @@ import type { AgentContext, AgentState } from './types.js';
 import { cancelWaitingTimer, cancelPermissionTimer, clearAgentActivity } from './timerManager.js';
 import { processTranscriptLine } from './transcriptParser.js';
 import { removeAgent, extractProjectName } from './agentManager.js';
-import { FILE_WATCHER_POLL_INTERVAL_MS, PROJECT_SCAN_INTERVAL_MS, ACTIVE_JSONL_MAX_AGE_MS, STALE_AGENT_TIMEOUT_MS } from './constants.js';
+import { resolveFloorForProject } from './floorAssignment.js';
+import { FILE_WATCHER_POLL_INTERVAL_MS, PROJECT_SCAN_INTERVAL_MS, ACTIVE_JSONL_MAX_AGE_MS, STALE_AGENT_TIMEOUT_MS, DEFAULT_FLOOR_ID } from './constants.js';
 
 /** 啟動檔案監視（fs.watch + 輪詢備援），偵測 JSONL 檔案變更 */
 export function startFileWatching(
@@ -37,9 +38,10 @@ export function readNewLines(
 	agentId: number,
 	ctx: AgentContext,
 ): void {
-	const { agents, waitingTimers, permissionTimers, sender } = ctx;
+	const { agents, waitingTimers, permissionTimers } = ctx;
 	const agent = agents.get(agentId);
 	if (!agent) return;
+	const sender = ctx.floorSender(agent.floorId);
 	try {
 		const stat = fs.statSync(agent.jsonlFile);
 		if (stat.size <= agent.fileOffset) return;
@@ -117,7 +119,7 @@ function scanAndAdopt(
 	projectDir: string,
 	ctx: AgentContext,
 ): void {
-	const { knownJsonlFiles, nextAgentIdRef, agents, sender, persistAgents } = ctx;
+	const { knownJsonlFiles, nextAgentIdRef, agents, persistAgents } = ctx;
 
 	let files: string[];
 	try {
@@ -136,6 +138,7 @@ function scanAndAdopt(
 		if (!isRecentlyActive(file)) continue;
 
 		// 自動收養：為此外部 Claude 會話建立代理
+		const floorId = resolveFloorForProject(projectDir, ctx.building);
 		const id = nextAgentIdRef.current++;
 		const agent: AgentState = {
 			id,
@@ -156,16 +159,18 @@ function scanAndAdopt(
 			tmuxSessionName: null,
 			isDetached: false,
 			transcriptLog: [],
+			floorId,
 		};
 		agents.set(id, agent);
 		ctx.trackedJsonlFiles.set(file, id);
 		persistAgents();
-		console.log(`[Pixel Agents] Auto-adopted session: ${path.basename(file)} → Agent ${id}`);
+		console.log(`[Pixel Agents] Auto-adopted session: ${path.basename(file)} → Agent ${id} (floor: ${floorId})`);
 		const isExternal = projectDir !== ctx.ownProjectDir;
-		sender?.postMessage({
+		ctx.floorSender(floorId).postMessage({
 			type: 'agentCreated',
 			id,
 			projectName: extractProjectName(projectDir),
+			floorId,
 			...(isExternal ? { isExternal: true } : {}),
 		});
 
@@ -180,7 +185,7 @@ function scanAndAdopt(
 
 /** 移除 JSONL 檔案最近未更新且沒有受管理進程的代理 */
 function checkStaleAgents(ctx: AgentContext): void {
-	const { agents, sender } = ctx;
+	const { agents } = ctx;
 
 	const staleIds: number[] = [];
 	for (const [id, agent] of agents) {
@@ -201,16 +206,18 @@ function checkStaleAgents(ctx: AgentContext): void {
 	}
 	for (const id of staleIds) {
 		const agent = agents.get(id);
+		const floorId = agent?.floorId || DEFAULT_FLOOR_ID;
+		const floorSend = ctx.floorSender(floorId);
 		if (agent && agent.activeToolIds.size > 0) {
 			agent.activeToolIds.clear();
 			agent.activeToolStatuses.clear();
 			agent.activeToolNames.clear();
 			agent.activeSubagentToolIds.clear();
 			agent.activeSubagentToolNames.clear();
-			sender?.postMessage({ type: 'agentToolsClear', id });
+			floorSend.postMessage({ type: 'agentToolsClear', id });
 		}
 		removeAgent(id, ctx);
-		sender?.postMessage({ type: 'agentClosed', id });
+		floorSend.postMessage({ type: 'agentClosed', id });
 	}
 }
 
@@ -220,7 +227,7 @@ export function reassignAgentToFile(
 	newFilePath: string,
 	ctx: AgentContext,
 ): void {
-	const { agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, sender, persistAgents } = ctx;
+	const { agents, fileWatchers, pollingTimers, waitingTimers, permissionTimers, persistAgents } = ctx;
 	const agent = agents.get(agentId);
 	if (!agent) return;
 
@@ -232,7 +239,7 @@ export function reassignAgentToFile(
 
 	cancelWaitingTimer(agentId, waitingTimers);
 	cancelPermissionTimer(agentId, permissionTimers);
-	clearAgentActivity(agent, agentId, permissionTimers, sender);
+	clearAgentActivity(agent, agentId, permissionTimers, ctx.floorSender(agent.floorId));
 
 	ctx.trackedJsonlFiles.delete(agent.jsonlFile);
 	agent.jsonlFile = newFilePath;

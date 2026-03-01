@@ -109,4 +109,10 @@ export const t = {
   // 佈局匯入驗證
   invalidLayoutFile: '無效的佈局檔案',
   parseLayoutFailed: '解析佈局檔案失敗',
+
+  // 樓層
+  lobby: '大廳',
+  addFloor: '新增樓層',
+  removeFloor: '移除樓層',
+  renameFloor: '重新命名',
 } as const

@@ -5,8 +5,9 @@ import { spawn, execSync } from 'child_process';
 import type { AgentContext, AgentState, PersistedAgent, MessageSender } from './types.js';
 import { cancelWaitingTimer, cancelPermissionTimer } from './timerManager.js';
 import { startFileWatching, readNewLines } from './fileWatcher.js';
-import { JSONL_POLL_INTERVAL_MS, JSONL_POLL_TIMEOUT_MS, LAYOUT_FILE_DIR, AGENTS_FILE_NAME, IGNORED_PROJECT_DIR_PATTERNS } from './constants.js';
+import { JSONL_POLL_INTERVAL_MS, JSONL_POLL_TIMEOUT_MS, LAYOUT_FILE_DIR, AGENTS_FILE_NAME, IGNORED_PROJECT_DIR_PATTERNS, DEFAULT_FLOOR_ID } from './constants.js';
 import { getCustomName, isProjectExcluded } from './projectNameStore.js';
+import { resolveFloorForProject } from './floorAssignment.js';
 import {
 	isTmuxAvailable,
 	tmuxSessionName as buildTmuxName,
@@ -75,6 +76,7 @@ export function savePersistedAgents(agents: Map<number, AgentState>): void {
 			jsonlFile: agent.jsonlFile,
 			projectDir: agent.projectDir,
 			tmuxSessionName: agent.tmuxSessionName ?? undefined,
+			floorId: agent.floorId,
 		});
 	}
 	try {
@@ -122,6 +124,7 @@ function createAgentState(
 	projectDir: string,
 	tmuxName: string | null,
 	isDetached: boolean,
+	floorId: string = DEFAULT_FLOOR_ID,
 ): AgentState {
 	let fileOffset = 0;
 	try {
@@ -149,6 +152,7 @@ function createAgentState(
 		tmuxSessionName: tmuxName,
 		isDetached,
 		transcriptLog: [],
+		floorId,
 	};
 }
 
@@ -165,7 +169,7 @@ function spawnClaudeAgent(
 ): void {
 	const {
 		nextAgentIdRef, agents, activeAgentIdRef, knownJsonlFiles,
-		jsonlPollTimers, sender, persistAgents,
+		jsonlPollTimers, persistAgents,
 	} = ctx;
 
 	const projectDir = path.dirname(expectedFile);
@@ -186,7 +190,9 @@ function spawnClaudeAgent(
 		console.log(`[Pixel Agents] tmux not available, using direct spawn`);
 	}
 
-	const agent = createAgentState(id, expectedFile, projectDir, tmuxName, false);
+	const floorId = resolveFloorForProject(projectDir, ctx.building);
+	const agent = createAgentState(id, expectedFile, projectDir, tmuxName, false, floorId);
+	const floorSend = ctx.floorSender(floorId);
 
 	if (!useTmux) {
 		// 直接生成 — 追蹤進程
@@ -211,13 +217,13 @@ function spawnClaudeAgent(
 		proc.on('error', (err) => {
 			console.error(`[Pixel Agents] Agent ${id}: process error:`, err);
 			removeAgent(id, ctx);
-			sender?.postMessage({ type: 'agentClosed', id });
+			ctx.floorSender(agent.floorId).postMessage({ type: 'agentClosed', id });
 		});
 
 		proc.on('exit', (code) => {
 			console.log(`[Pixel Agents] Agent ${id}: process exited with code ${code}`);
 			removeAgent(id, ctx);
-			sender?.postMessage({ type: 'agentClosed', id });
+			ctx.floorSender(agent.floorId).postMessage({ type: 'agentClosed', id });
 		});
 	}
 
@@ -225,12 +231,13 @@ function spawnClaudeAgent(
 	ctx.trackedJsonlFiles.set(agent.jsonlFile, id);
 	activeAgentIdRef.current = id;
 	persistAgents();
-	console.log(`[Pixel Agents] Agent ${id}: ${label}`);
+	console.log(`[Pixel Agents] Agent ${id}: ${label} (floor: ${floorId})`);
 	const isExternal = projectDir !== ctx.ownProjectDir;
-	sender?.postMessage({
+	floorSend.postMessage({
 		type: 'agentCreated',
 		id,
 		projectName: extractProjectName(projectDir),
+		floorId,
 		...(isExternal ? { isExternal: true } : {}),
 	});
 
@@ -255,7 +262,7 @@ function spawnClaudeAgent(
 				killTmuxSession(agent.tmuxSessionName);
 			}
 			removeAgent(id, ctx);
-			sender?.postMessage({ type: 'agentClosed', id });
+			ctx.floorSender(agent.floorId).postMessage({ type: 'agentClosed', id });
 		}
 	}, JSONL_POLL_INTERVAL_MS);
 	jsonlPollTimers.set(id, pollTimer);
@@ -316,9 +323,11 @@ export function closeAgent(
 	agentId: number,
 	ctx: AgentContext,
 ): void {
-	const { agents, sender } = ctx;
+	const { agents } = ctx;
 	const agent = agents.get(agentId);
 	if (!agent) return;
+
+	const floorId = agent.floorId;
 
 	// 如果存在 tmux 會話則終止
 	if (agent.tmuxSessionName) {
@@ -331,7 +340,7 @@ export function closeAgent(
 	}
 
 	removeAgent(agentId, ctx);
-	sender?.postMessage({ type: 'agentClosed', id: agentId });
+	ctx.floorSender(floorId).postMessage({ type: 'agentClosed', id: agentId });
 }
 
 // ── 伺服器重啟時的 tmux 恢復 ─────────────────────────
@@ -340,7 +349,7 @@ export function closeAgent(
 export function recoverTmuxAgents(
 	ctx: AgentContext,
 ): number {
-	const { nextAgentIdRef, agents, knownJsonlFiles, sender, persistAgents } = ctx;
+	const { nextAgentIdRef, agents, knownJsonlFiles, persistAgents } = ctx;
 
 	if (!isTmuxAvailable()) return 0;
 
@@ -362,11 +371,13 @@ export function recoverTmuxAgents(
 		// 嘗試在持久化資料中找到此會話
 		let jsonlFile: string | null = null;
 		let projectDir: string | null = null;
+		let persistedFloorId: string | undefined;
 
 		const match = persistedMap.get(sessionName);
 		if (match) {
 			jsonlFile = match.jsonlFile;
 			projectDir = match.projectDir;
+			persistedFloorId = match.floorId;
 		} else {
 			// 備選：嘗試透過從會話名稱提取的 UUID 尋找 JSONL
 			const uuid = parseSessionUuid(sessionName);
@@ -392,19 +403,21 @@ export function recoverTmuxAgents(
 		if (knownJsonlFiles.has(jsonlFile)) continue;
 		knownJsonlFiles.add(jsonlFile);
 
+		const floorId = persistedFloorId || resolveFloorForProject(projectDir, ctx.building);
 		const id = nextAgentIdRef.current++;
-		const agent = createAgentState(id, jsonlFile, projectDir, sessionName, false);
+		const agent = createAgentState(id, jsonlFile, projectDir, sessionName, false, floorId);
 		// 從頭讀取以重建狀態
 		agent.fileOffset = 0;
 		agents.set(id, agent);
 		ctx.trackedJsonlFiles.set(agent.jsonlFile, id);
 
-		console.log(`[Pixel Agents] Recovered tmux agent ${id}: ${sessionName}`);
+		console.log(`[Pixel Agents] Recovered tmux agent ${id}: ${sessionName} (floor: ${floorId})`);
 		const isExternal = projectDir !== ctx.ownProjectDir;
-		sender?.postMessage({
+		ctx.floorSender(floorId).postMessage({
 			type: 'agentCreated',
 			id,
 			projectName: extractProjectName(projectDir),
+			floorId,
 			...(isExternal ? { isExternal: true } : {}),
 		});
 
@@ -429,41 +442,47 @@ export function recoverTmuxAgents(
 export function checkTmuxHealth(
 	ctx: AgentContext,
 ): void {
-	const { agents, sender } = ctx;
+	const { agents } = ctx;
 
 	for (const [agentId, agent] of agents) {
 		if (!agent.tmuxSessionName) continue;
 		if (!isTmuxSessionAlive(agent.tmuxSessionName)) {
 			console.log(`[Pixel Agents] tmux session ${agent.tmuxSessionName} died, removing agent ${agentId}`);
+			const floorId = agent.floorId;
 			removeAgent(agentId, ctx);
-			sender?.postMessage({ type: 'agentClosed', id: agentId });
+			ctx.floorSender(floorId).postMessage({ type: 'agentClosed', id: agentId });
 		}
 	}
 }
 
-/** 發送現有代理清單與其當前狀態至客戶端（此函式不需要完整 context） */
+/** 發送現有代理清單與其當前狀態至客戶端（過濾至指定樓層） */
 export function sendExistingAgents(
 	agents: Map<number, AgentState>,
 	agentMeta: Record<string, { palette?: number; hueShift?: number; seatId?: string }>,
 	sender: MessageSender | undefined,
 	ownProjectDir: string,
+	floorId?: string,
 ): void {
 	if (!sender) return;
 	const agentIds: number[] = [];
-	for (const id of agents.keys()) {
+	for (const [id, agent] of agents) {
+		if (floorId && agent.floorId !== floorId) continue;
 		agentIds.push(id);
 	}
 	agentIds.sort((a, b) => a - b);
 
 	// 為每個代理補充專案資訊
-	const enrichedMeta: Record<string, { palette?: number; hueShift?: number; seatId?: string; isExternal?: boolean; projectName?: string }> = {};
+	const enrichedMeta: Record<string, { palette?: number; hueShift?: number; seatId?: string; isExternal?: boolean; projectName?: string; floorId?: string }> = {};
 	for (const [idStr, meta] of Object.entries(agentMeta)) {
 		enrichedMeta[idStr] = { ...meta };
 	}
-	for (const [id, agent] of agents) {
+	for (const id of agentIds) {
+		const agent = agents.get(id);
+		if (!agent) continue;
 		const key = String(id);
 		if (!enrichedMeta[key]) enrichedMeta[key] = {};
 		enrichedMeta[key].projectName = extractProjectName(agent.projectDir);
+		enrichedMeta[key].floorId = agent.floorId;
 		const isExternal = agent.projectDir !== ownProjectDir;
 		if (isExternal) {
 			enrichedMeta[key].isExternal = true;
@@ -477,18 +496,20 @@ export function sendExistingAgents(
 	});
 
 	// 重新傳送當前狀態
-	for (const [agentId, agent] of agents) {
+	for (const id of agentIds) {
+		const agent = agents.get(id);
+		if (!agent) continue;
 		if (agent.model) {
 			sender.postMessage({
 				type: 'agentModel',
-				id: agentId,
+				id,
 				model: agent.model,
 			});
 		}
 		for (const [toolId, status] of agent.activeToolStatuses) {
 			sender.postMessage({
 				type: 'agentToolStart',
-				id: agentId,
+				id,
 				toolId,
 				status,
 			});
@@ -496,7 +517,7 @@ export function sendExistingAgents(
 		if (agent.isWaiting) {
 			sender.postMessage({
 				type: 'agentStatus',
-				id: agentId,
+				id,
 				status: 'waiting',
 			});
 		}

@@ -125,7 +125,7 @@ function App() {
 
   const isEditDirty = useCallback(() => editor.isEditMode && editor.isDirty, [editor.isEditMode, editor.isDirty])
 
-  const { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, agentTranscripts, projectDirs } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
+  const { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, agentTranscripts, projectDirs, currentFloorId, building } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
 
   const [isDebugMode, setIsDebugMode] = useState(false)
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false)
@@ -138,6 +138,10 @@ function App() {
   }, [])
 
   const handleToggleDebugMode = useCallback(() => setIsDebugMode((prev) => !prev), [])
+
+  const handleSwitchFloor = useCallback((floorId: string) => {
+    vscode.postMessage({ type: 'switchFloor', floorId })
+  }, [])
 
   const handleOpenSessionPicker = useCallback(() => {
     setIsSessionPickerOpen(true)
@@ -321,6 +325,9 @@ function App() {
         onOpenSessionPicker={handleOpenSessionPicker}
         isDebugMode={isDebugMode}
         onToggleDebugMode={handleToggleDebugMode}
+        floors={building?.floors ?? []}
+        currentFloorId={currentFloorId}
+        onSwitchFloor={handleSwitchFloor}
       />
 
       <SessionPicker

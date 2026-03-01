@@ -8,7 +8,7 @@ import { Server } from 'socket.io';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-import type { AgentContext, AgentState, ClientMessage, MessageSender } from './types.js';
+import type { AgentContext, AgentState, ClientMessage, MessageSender, FloorId } from './types.js';
 import {
 	loadFurnitureAssets,
 	loadFloorTiles,
@@ -17,13 +17,15 @@ import {
 	loadDefaultLayout,
 } from './assetLoader.js';
 import type { LoadedAssets, LoadedFloorTiles, LoadedWallTiles, LoadedCharacterSprites } from './assetLoader.js';
-import { writeLayoutToFile, loadLayout } from './layoutPersistence.js';
+// layoutPersistence 保留供舊路徑備用
+import { loadBuildingConfig, loadFloorLayout, writeFloorLayout, addFloor as addBuildingFloor, removeFloor as removeBuildingFloor, renameFloor as renameBuildingFloor } from './buildingPersistence.js';
 import { closeAgent, removeAgent, sendExistingAgents, getAllProjectDirs, getProjectDirPath, resumeSession, recoverTmuxAgents, checkTmuxHealth, savePersistedAgents } from './agentManager.js';
 import { setCustomName, addExcludedProject, removeExcludedProject, readExcludedProjects } from './projectNameStore.js';
 import { scanAllSessions } from './sessionScanner.js';
 import { ensureProjectScan } from './fileWatcher.js';
 import {
 	DEFAULT_PORT,
+	DEFAULT_FLOOR_ID,
 	LAYOUT_FILE_DIR,
 	SETTINGS_FILE_NAME,
 	AGENT_SEATS_FILE_NAME,
@@ -111,6 +113,11 @@ console.log(`[Pixel Agents] Own project dir: ${ownProjectDir}`);
 
 // ── AgentContext — 集中管理的共享狀態 ──────────────────────
 
+// ── 樓層 / 建築物 ──────────────────────────────────────────
+const socketFloors = new Map<string, FloorId>();
+const building = loadBuildingConfig();
+console.log(`[Pixel Agents] Building: ${building.floors.length} floor(s), default=${building.defaultFloorId}`);
+
 /** 暫時的 sender 佔位 — 在 socket 連線時更新 */
 const ctx: AgentContext = {
 	agents,
@@ -126,6 +133,9 @@ const ctx: AgentContext = {
 	persistAgents,
 	trackedJsonlFiles: new Map(),
 	ownProjectDir,
+	socketFloors,
+	building,
+	floorSender: () => ({ postMessage() {} }), // 佔位，main() 中替換
 };
 
 // ── tmux 健康檢查 ───────────────────────────────────────
@@ -195,16 +205,28 @@ async function main(): Promise<void> {
 		app.use(express.static(clientDistPath));
 	}
 
-	// 廣播 sender — 所有伺服器主動推送（agentCreated/Closed、agentToolStart/Done 等）走這裡
+	// 全域廣播 sender — 用於需要送達所有客戶端的訊息（如 projectNameUpdated）
 	ctx.sender = {
 		postMessage(msg: unknown) {
 			io.emit('message', msg);
 		},
 	};
 
+	// 樓層 sender — 僅廣播至特定樓層的客戶端
+	ctx.floorSender = (floorId: FloorId) => ({
+		postMessage(msg: unknown) {
+			io.to(`floor:${floorId}`).emit('message', msg);
+		},
+	});
+
 	// Socket.IO 連線處理器
 	io.on('connection', (socket) => {
 		console.log(`[Pixel Agents] Client connected: ${socket.id}`);
+
+		// 預設加入預設樓層的 room
+		const defaultFloor = ctx.building.defaultFloorId;
+		socket.join(`floor:${defaultFloor}`);
+		socketFloors.set(socket.id, defaultFloor);
 
 		// 單播 sender — 用於對請求者的直接回覆（webviewReady 素材/佈局等）
 		const directSender: MessageSender = {
@@ -214,11 +236,12 @@ async function main(): Promise<void> {
 		};
 
 		socket.on('message', (msg: unknown) => {
-			handleClientMessage(msg as ClientMessage, directSender);
+			handleClientMessage(msg as ClientMessage, directSender, socket);
 		});
 
 		socket.on('disconnect', () => {
 			console.log(`[Pixel Agents] Client disconnected: ${socket.id}`);
+			socketFloors.delete(socket.id);
 			if (isDemoEnabled()) {
 				stopDemoMode();
 			}
@@ -291,11 +314,11 @@ function setupGracefulShutdown(
 	process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
-function handleClientMessage(msg: ClientMessage, sender: MessageSender): void {
+function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?: import('socket.io').Socket): void {
 	console.log(`[Pixel Agents] Received message: ${msg.type}`);
 	switch (msg.type) {
 		case 'webviewReady': {
-			// 依序傳送素材
+			// 依序傳送素材（共用，unicast）
 			if (cachedCharSprites) {
 				sender.postMessage({
 					type: 'characterSpritesLoaded',
@@ -326,19 +349,23 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender): void {
 				});
 			}
 
-			// 傳送佈局
-			const layout = loadLayout(defaultLayout);
+			// 傳送建築物配置
+			sender.postMessage({ type: 'buildingConfig', building: ctx.building });
+
+			// 傳送當前樓層佈局
+			const currentFloor = (socket && socketFloors.get(socket.id)) || ctx.building.defaultFloorId;
+			const layout = loadFloorLayout(currentFloor, defaultLayout);
 			sender.postMessage({ type: 'layoutLoaded', layout });
 
 			// 傳送設定
 			const settings = readJsonFile<{ soundEnabled?: boolean }>(getSettingsPath(), {});
 			sender.postMessage({ type: 'settingsLoaded', soundEnabled: settings.soundEnabled ?? true });
 
-			// 傳送現有代理
+			// 傳送當前樓層的現有代理
 			const agentMeta = readJsonFile<Record<string, { palette?: number; hueShift?: number; seatId?: string }>>(
 				getAgentSeatsPath(), {},
 			);
-			sendExistingAgents(agents, agentMeta, sender, ownProjectDir);
+			sendExistingAgents(agents, agentMeta, sender, ownProjectDir, currentFloor);
 
 			// 傳送排除專案清單
 			sender.postMessage({ type: 'excludedProjectsUpdated', excluded: readExcludedProjects() });
@@ -353,8 +380,8 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender): void {
 					tmuxRecoveredRef.current = true;
 					recoverTmuxAgents(ctx);
 				}
-				// 恢復後重新傳送現有代理（包含已恢復的 tmux 代理）
-				sendExistingAgents(agents, agentMeta, sender, ownProjectDir);
+				// 恢復後重新傳送現有代理（包含已恢復的 tmux 代理，過濾至當前樓層）
+				sendExistingAgents(agents, agentMeta, sender, ownProjectDir, currentFloor);
 
 				// 啟動專案掃描 — 自動偵測所有專案中正在執行的 Claude 會話
 				const projectDirs = getAllProjectDirs();
@@ -378,7 +405,8 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender): void {
 			break;
 		}
 		case 'saveLayout': {
-			writeLayoutToFile(msg.layout);
+			const floorId = (socket && socketFloors.get(socket.id)) || DEFAULT_FLOOR_ID;
+			writeFloorLayout(floorId, msg.layout);
 			break;
 		}
 		case 'setSoundEnabled': {
@@ -397,8 +425,9 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender): void {
 			break;
 		}
 		case 'requestExportLayout': {
-			const layout = loadLayout(defaultLayout);
-			sender.postMessage({ type: 'exportLayoutData', layout });
+			const exportFloor = (socket && socketFloors.get(socket.id)) || DEFAULT_FLOOR_ID;
+			const exportLayout = loadFloorLayout(exportFloor, defaultLayout);
+			sender.postMessage({ type: 'exportLayoutData', layout: exportLayout });
 			break;
 		}
 		case 'setProjectName': {
@@ -428,8 +457,10 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender): void {
 				}
 			}
 			for (const agentId of toRemove) {
+				const removedAgent = agents.get(agentId);
+				const removedFloor = removedAgent?.floorId || DEFAULT_FLOOR_ID;
 				removeAgent(agentId, ctx);
-				ctx.sender?.postMessage({ type: 'agentClosed', id: agentId });
+				ctx.floorSender(removedFloor).postMessage({ type: 'agentClosed', id: agentId });
 			}
 			ctx.sender?.postMessage({ type: 'excludedProjectsUpdated', excluded: readExcludedProjects() });
 			break;
@@ -455,6 +486,46 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender): void {
 			} catch { /* 目錄不存在則回傳空陣列 */ }
 			dirs.sort((a, b) => a.name.localeCompare(b.name));
 			sender.postMessage({ type: 'projectDirsList', dirs });
+			break;
+		}
+		case 'switchFloor': {
+			if (!socket) break;
+			const oldFloor = socketFloors.get(socket.id);
+			if (oldFloor) socket.leave(`floor:${oldFloor}`);
+			socket.join(`floor:${msg.floorId}`);
+			socketFloors.set(socket.id, msg.floorId);
+			sender.postMessage({ type: 'floorSwitched', floorId: msg.floorId });
+			// 發送新樓層的佈局和代理
+			const switchLayout = loadFloorLayout(msg.floorId, defaultLayout);
+			sender.postMessage({ type: 'layoutLoaded', layout: switchLayout });
+			const switchMeta = readJsonFile<Record<string, { palette?: number; hueShift?: number; seatId?: string }>>(
+				getAgentSeatsPath(), {},
+			);
+			sendExistingAgents(agents, switchMeta, sender, ownProjectDir, msg.floorId);
+			break;
+		}
+		case 'saveFloorLayout': {
+			writeFloorLayout(msg.floorId, msg.layout);
+			break;
+		}
+		case 'addFloor': {
+			const newFloor = addBuildingFloor(ctx.building, msg.name);
+			console.log(`[Pixel Agents] Added floor: ${newFloor.id} "${newFloor.name}"`);
+			ctx.sender?.postMessage({ type: 'buildingConfig', building: ctx.building });
+			break;
+		}
+		case 'removeFloor': {
+			const removed = removeBuildingFloor(ctx.building, msg.floorId);
+			if (removed) {
+				console.log(`[Pixel Agents] Removed floor: ${msg.floorId}`);
+				ctx.sender?.postMessage({ type: 'buildingConfig', building: ctx.building });
+			}
+			break;
+		}
+		case 'renameFloor': {
+			renameBuildingFloor(ctx.building, msg.floorId, msg.name);
+			console.log(`[Pixel Agents] Renamed floor ${msg.floorId} to "${msg.name}"`);
+			ctx.sender?.postMessage({ type: 'buildingConfig', building: ctx.building });
 			break;
 		}
 	}

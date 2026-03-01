@@ -499,6 +499,18 @@ export class OfficeState {
     }
   }
 
+  /** 清除所有代理和子代理（樓層切換時使用） */
+  clearAllAgents(): void {
+    this.characters.clear()
+    this.subagentIdMap.clear()
+    this.subagentMeta.clear()
+    this.selectedAgentId = null
+    this.cameraFollowId = null
+    for (const seat of this.seats.values()) {
+      seat.assigned = false
+    }
+  }
+
   /** 查找指定 parent+toolId 的子代理角色 ID，若無則回傳 null */
   getSubagentId(parentAgentId: number, parentToolId: string): number | null {
     return this.subagentIdMap.get(`${parentAgentId}:${parentToolId}`) ?? null

@@ -1,4 +1,5 @@
 import type { MessageSender } from './types.js';
+import { DEFAULT_FLOOR_ID } from './constants.js';
 
 interface DemoTool {
 	name: string;
@@ -170,7 +171,7 @@ export function startDemoMode(sender: MessageSender, agentCount: number = 3): vo
 				timers: [],
 			};
 			demoAgents.push(agent);
-			sender.postMessage({ type: 'agentCreated', id });
+			sender.postMessage({ type: 'agentCreated', id, floorId: DEFAULT_FLOOR_ID });
 			// 模擬模型指派 — 在模型間交替
 			const demoModels = ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5-20251001'];
 			sender.postMessage({ type: 'agentModel', id, model: demoModels[(id - 1) % demoModels.length] });

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { OfficeState } from '../office/engine/officeState.js'
 import type { OfficeLayout, ToolActivity, EmoteType } from '../office/types.js'
-import type { ServerMessage } from '../types/messages.js'
+import type { ServerMessage, BuildingConfig } from '../types/messages.js'
 import { extractToolName } from '../office/toolUtils.js'
 import { migrateLayoutColors } from '../office/layout/layoutSerializer.js'
 import { buildDynamicCatalog } from '../office/layout/furnitureCatalog.js'
@@ -62,6 +62,10 @@ export interface ExtensionMessageState {
   excludedProjects: string[]
   /** ~/.claude/projects/ 下所有專案目錄（含排除狀態） */
   projectDirs: { name: string; excluded: boolean }[]
+  /** 當前觀看的樓層 ID */
+  currentFloorId: string | null
+  /** 建築物配置 */
+  building: BuildingConfig | null
 }
 
 /** 轉錄記錄條目 */
@@ -101,6 +105,8 @@ interface HandlerContext {
   setAgentTranscripts: React.Dispatch<React.SetStateAction<Record<number, TranscriptEntry[]>>>
   setExcludedProjects: React.Dispatch<React.SetStateAction<string[]>>
   setProjectDirs: React.Dispatch<React.SetStateAction<{ name: string; excluded: boolean }[]>>
+  setCurrentFloorId: React.Dispatch<React.SetStateAction<string | null>>
+  setBuilding: React.Dispatch<React.SetStateAction<BuildingConfig | null>>
 }
 
 // ── Message Handlers ───────────────────────────────────────────
@@ -406,6 +412,27 @@ function handleProjectDirsList(msg: ServerMessage & { type: 'projectDirsList' },
   ctx.setProjectDirs(msg.dirs)
 }
 
+function handleBuildingConfig(msg: ServerMessage & { type: 'buildingConfig' }, ctx: HandlerContext): void {
+  ctx.setBuilding(msg.building)
+  ctx.setCurrentFloorId((prev) => prev ?? msg.building.defaultFloorId)
+}
+
+function handleFloorSwitched(msg: ServerMessage & { type: 'floorSwitched' }, ctx: HandlerContext): void {
+  ctx.setCurrentFloorId(msg.floorId)
+  // 清空當前代理相關狀態，新樓層的資料會隨 existingAgents + layoutLoaded 到來
+  ctx.setAgents([])
+  ctx.setAgentTools({})
+  ctx.setAgentStatuses({})
+  ctx.setAgentModels({})
+  ctx.setSubagentTools({})
+  ctx.setSubagentCharacters([])
+  ctx.setAgentProjects({})
+  ctx.setAgentTranscripts({})
+  ctx.os.clearAllAgents()
+  ctx.layoutReadyRef.current = false
+  ctx.setLayoutReady(false)
+}
+
 // ── Handler 查找表 ──────────────────────────────────────────────
 
 type HandlerFn = (msg: never, ctx: HandlerContext) => void
@@ -439,6 +466,8 @@ const messageHandlers: Record<string, HandlerFn> = {
   projectNameUpdated: handleProjectNameUpdated as HandlerFn,
   excludedProjectsUpdated: handleExcludedProjectsUpdated as HandlerFn,
   projectDirsList: handleProjectDirsList as HandlerFn,
+  buildingConfig: handleBuildingConfig as HandlerFn,
+  floorSwitched: handleFloorSwitched as HandlerFn,
 }
 
 // ── Hook ────────────────────────────────────────────────────────
@@ -461,6 +490,8 @@ export function useExtensionMessages(
   const [agentTranscripts, setAgentTranscripts] = useState<Record<number, TranscriptEntry[]>>({})
   const [excludedProjects, setExcludedProjects] = useState<string[]>([])
   const [projectDirs, setProjectDirs] = useState<{ name: string; excluded: boolean }[]>([])
+  const [currentFloorId, setCurrentFloorId] = useState<string | null>(null)
+  const [building, setBuilding] = useState<BuildingConfig | null>(null)
 
   const layoutReadyRef = useRef(false)
   const pendingAgentsRef = useRef<Array<{ id: number; palette?: number; hueShift?: number; seatId?: string }>>([])
@@ -485,6 +516,8 @@ export function useExtensionMessages(
       setAgentTranscripts,
       setExcludedProjects,
       setProjectDirs,
+      setCurrentFloorId,
+      setBuilding,
     }
 
     const handler = (data: unknown) => {
@@ -500,5 +533,5 @@ export function useExtensionMessages(
     return unsub
   }, [getOfficeState])
 
-  return { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, agentTranscripts, excludedProjects, projectDirs }
+  return { agents, selectedAgent, agentTools, agentStatuses, agentModels, subagentTools, subagentCharacters, layoutReady, loadedAssets, agentProjects, agentTranscripts, excludedProjects, projectDirs, currentFloorId, building }
 }

@@ -15,7 +15,9 @@ web/
       fileWatcher.ts          — fs.watch + 2s 輪詢、JSONL 增量讀取、自動收養
       transcriptParser.ts     — JSONL 解析：tool_use/tool_result → Socket.IO 訊息
       assetLoader.ts          — PNG 解析、精靈圖轉換、家具目錄建構、預設佈局載入
-      layoutPersistence.ts    — ~/.pixel-agents/layout.json 讀寫
+      layoutPersistence.ts    — ~/.pixel-agents/layout.json 讀寫（舊版單層佈局，保留供備用）
+      buildingPersistence.ts  — 建築物配置 + 樓層佈局持久化（~/.pixel-agents/building.json + floors/*.json）
+      floorAssignment.ts      — 專案→樓層映射持久化（~/.pixel-agents/project-floor-map.json）
       projectNameStore.ts     — 自訂專案名稱映射 + 專案排除清單持久化
       sessionScanner.ts       — 工作階段掃描（瀏覽過去會話）
       timerManager.ts         — 等待/權限計時器邏輯
@@ -23,7 +25,7 @@ web/
       demoMode.ts             — 演示模式：模擬代理行為序列（--demo 旗標）
       colorUtils.ts           — 伺服器端色彩工具
       constants.ts            — 伺服器常數（計時、截斷、解析、端口 3000）
-      types.ts                — 共享介面（AgentState, MessageSender, ClientMessage, AgentContext）
+      types.ts                — 共享介面（AgentState, MessageSender, ClientMessage, AgentContext, FloorConfig, BuildingConfig）
 
   client/                     — React + TypeScript（Vite）
     src/
@@ -44,6 +46,7 @@ web/
         ZoomControls.tsx       — +/- 縮放（右上角）
         DebugView.tsx          — 除錯覆蓋層
         AgentLabels.tsx        — 代理名稱標籤（可雙擊改名）
+        FloorSelector.tsx      — 樓層切換按鈕列（嵌入 BottomToolbar）
         ErrorBoundary.tsx      — React 錯誤邊界
       office/                 — 遊戲引擎（結構同 webview-ui/src/office/）
         types.ts              — 遊戲型別（EmoteType, CharacterState, EditTool 等）
@@ -93,9 +96,11 @@ scripts/                      — 7 階段素材擷取管線
 
 ## 核心概念
 
-**術語**：Session = `~/.claude/projects/<hash>/` 下的 JSONL 對話檔案。Agent = 與會話 1:1 綁定的動畫角色。
+**術語**：Session = `~/.claude/projects/<hash>/` 下的 JSONL 對話檔案。Agent = 與會話 1:1 綁定的動畫角色。Floor = 獨立的辦公室佈局空間，代理依專案分配至不同樓層。
 
-**伺服器 ↔ 客戶端**（Web）：Socket.IO 雙向 `emit('message', msg)`。`socketApi.ts` 包裝為 `vscode.postMessage()` 以維持客戶端相容性。主要訊息類型：`agentCreated/Closed`、`focusAgent`、`agentToolStart/Done/Clear`、`agentStatus`、`existingAgents`、`layoutLoaded`、`furnitureAssetsLoaded`、`floorTilesLoaded`、`wallTilesLoaded`、`saveLayout`、`saveAgentSeats`、`settingsLoaded`、`setSoundEnabled`、`characterSpritesLoaded`、`subagentToolStart/Done`、`subagentClear`、`agentToolPermission/PermissionClear`、`subagentToolPermission`、`agentModel`、`agentDetached`、`agentThinking`、`agentEmote`、`agentTranscript`、`sessionsList`、`exportLayoutData`、`projectNameUpdated`、`excludedProjectsUpdated`、`projectDirsList`。
+**多樓層系統**：虛擬辦公室大樓，每層有獨立佈局。`BuildingConfig`（`building.json`）管理樓層清單。每個代理攜帶 `floorId`。Socket.IO 使用 `floor:<id>` Room 隔離廣播 — 代理狀態變更只推送至同樓層的客戶端。`ctx.floorSender(floorId)` 取代舊的全域 `ctx.sender` 用於代理相關訊息。全域訊息（`projectNameUpdated`、`excludedProjectsUpdated`、`buildingConfig`）仍用 `ctx.sender` 廣播。客戶端切換樓層時發送 `switchFloor` → 伺服器 leave/join Room → 回傳新樓層佈局和代理。首次啟動自動遷移 `layout.json` → `floors/1F.json`。`floorAssignment.ts` 持久化專案→樓層映射（`project-floor-map.json`），自動偵測時查詢映射決定代理樓層。
+
+**伺服器 ↔ 客戶端**（Web）：Socket.IO 雙向 `emit('message', msg)`。`socketApi.ts` 包裝為 `vscode.postMessage()` 以維持客戶端相容性。主要訊息類型：`agentCreated/Closed`、`focusAgent`、`agentToolStart/Done/Clear`、`agentStatus`、`existingAgents`、`layoutLoaded`、`furnitureAssetsLoaded`、`floorTilesLoaded`、`wallTilesLoaded`、`saveLayout`、`saveAgentSeats`、`settingsLoaded`、`setSoundEnabled`、`characterSpritesLoaded`、`subagentToolStart/Done`、`subagentClear`、`agentToolPermission/PermissionClear`、`subagentToolPermission`、`agentModel`、`agentDetached`、`agentThinking`、`agentEmote`、`agentTranscript`、`sessionsList`、`exportLayoutData`、`projectNameUpdated`、`excludedProjectsUpdated`、`projectDirsList`、`buildingConfig`、`floorSwitched`、`switchFloor`、`addFloor`、`removeFloor`、`renameFloor`。
 
 **代理建立**（Web）：兩種路徑 — (1) 自動偵測：`ensureProjectScan()` 發現活躍 JSONL → 建立 process=null 的代理。(2) 會話恢復：使用者從 SessionPicker 選取過去的會話 → `resumeSession()` → `spawn('claude', ['--resume', sessionId])`。外部專案代理帶 `projectName`（從目錄路徑提取或自訂名稱），`agentCreated` 訊息包含 `projectName` 供標籤顯示。
 
@@ -245,8 +250,11 @@ npm install && cd webview-ui && npm install && cd .. && npm run build
 
 | 檔案 | 用途 |
 |------|------|
-| `layout.json` | 辦公室佈局（地板、牆壁、家具） |
-| `persisted-agents.json` | 代理外觀與座位（palette/hueShift/seatId） |
+| `layout.json` | 舊版辦公室佈局（保留供備用，已遷移至 floors/） |
+| `building.json` | 建築物配置（樓層清單、預設樓層） |
+| `floors/*.json` | 各樓層佈局（地板、牆壁、家具） |
+| `project-floor-map.json` | 專案→樓層映射 |
+| `persisted-agents.json` | 代理外觀與座位（palette/hueShift/seatId/floorId） |
 | `project-names.json` | 自訂專案顯示名稱映射 |
 | `excluded-projects.json` | 排除的專案資料夾清單 |
 | `settings.json` | 音效通知等使用者設定 |
