@@ -27,12 +27,17 @@ import { ContextMenu } from './components/ContextMenu.js'
 import type { ContextMenuAction } from './components/ContextMenu.js'
 import { TerminalPanel } from './components/TerminalPanel.js'
 import { BehaviorEditorModal } from './components/BehaviorEditorModal.js'
+import { RecordingListModal } from './components/RecordingListModal.js'
+import { Recorder } from './office/engine/recorder.js'
+import type { RecordingState, RecordingFrame } from './office/engine/recorder.js'
+import { saveRecording } from './office/engine/recordingStorage.js'
 import { Dashboard } from './pages/Dashboard.js'
 import { t } from './i18n.js'
 
 // 遊戲狀態存在於 React 之外 — 由訊息處理器以命令式方式更新
 const officeStateRef = { current: null as OfficeState | null }
 const editorState = new EditorState()
+const recorderInstance = new Recorder()
 
 function getOfficeState(): OfficeState {
   if (!officeStateRef.current) {
@@ -150,6 +155,41 @@ function App() {
 
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // 錄製/回放狀態
+  const [recorderState, setRecorderState] = useState<RecordingState>('idle')
+  const [recordingDuration, setRecordingDuration] = useState(0)
+  const [playbackProgress, setPlaybackProgress] = useState(0)
+  const [isRecordingListOpen, setIsRecordingListOpen] = useState(false)
+
+  useEffect(() => {
+    recorderInstance.onStateChange = setRecorderState
+    recorderInstance.onPlaybackProgress = setPlaybackProgress
+    recorderInstance.onRecordingTick = setRecordingDuration
+  }, [])
+
+  const handleStartRecording = useCallback(() => {
+    recorderInstance.startRecording()
+  }, [])
+
+  const handleStopRecording = useCallback(async () => {
+    const result = recorderInstance.stopRecording()
+    if (result) {
+      await saveRecording(result.meta, result.frames)
+    }
+  }, [])
+
+  const handleStopPlayback = useCallback(() => {
+    recorderInstance.stopPlayback(getOfficeState())
+  }, [])
+
+  const handlePlayRecording = useCallback((frames: RecordingFrame[]) => {
+    recorderInstance.startPlayback(frames, getOfficeState())
+  }, [])
+
+  const handleSeekPlayback = useCallback((progress: number) => {
+    recorderInstance.seekTo(progress, getOfficeState())
+  }, [])
+
   useEditorKeyboard(
     editor.isEditMode,
     editorState,
@@ -252,6 +292,7 @@ function App() {
           dayNightEnabled={display.dayNightEnabled}
           dayNightTimeOverride={display.dayNightTimeOverride}
           onContextMenu={interaction.handleContextMenu}
+          recorder={recorderInstance}
         />
       </div>
       )}
@@ -328,6 +369,14 @@ function App() {
         onToggleSettings={panels.handleToggleSettings}
         isBehaviorEditorOpen={panels.isBehaviorEditorOpen}
         onToggleBehaviorEditor={panels.handleToggleBehaviorEditor}
+        recorderState={recorderState}
+        recordingDuration={recordingDuration}
+        playbackProgress={playbackProgress}
+        onStartRecording={handleStartRecording}
+        onStopRecording={handleStopRecording}
+        onStopPlayback={handleStopPlayback}
+        onOpenRecordingList={() => setIsRecordingListOpen(true)}
+        onSeekPlayback={handleSeekPlayback}
       />
 
       <SessionPicker
@@ -353,6 +402,12 @@ function App() {
       <BehaviorEditorModal
         isOpen={panels.isBehaviorEditorOpen}
         onClose={panels.handleToggleBehaviorEditor}
+      />
+
+      <RecordingListModal
+        isOpen={isRecordingListOpen}
+        onClose={() => setIsRecordingListOpen(false)}
+        onPlay={handlePlayRecording}
       />
 
       <ChatPanel messages={chatMessages} />

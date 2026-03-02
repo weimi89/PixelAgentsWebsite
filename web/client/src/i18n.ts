@@ -268,4 +268,20 @@ export const t = {
     five_sessions: '老手',
     bash_user: '命令行達人',
   } as Record<string, string>,
+
+  // 錄製/回放
+  recording: '錄製',
+  stopRecording: '停止錄製',
+  recordingList: '錄製清單',
+  noRecordings: '沒有錄製',
+  playRecording: '播放',
+  deleteRecording: '刪除',
+  exportRecording: '匯出',
+  importRecording: '匯入',
+  recordingDuration: (n: number) => `${n.toFixed(1)}s`,
+  recordingFrames: (n: number) => `${n} 幀`,
+  playback: '回放中',
+  stopPlayback: '停止',
+  recordingName: '名稱',
+  importRecordingFailed: '匯入錄製失敗',
 } as const

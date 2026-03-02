@@ -3,6 +3,7 @@ import { SettingsModal } from './SettingsModal.js'
 import { FloorSelector } from './FloorSelector.js'
 import { t } from '../i18n.js'
 import type { FloorConfig } from '../types/messages.js'
+import type { RecordingState } from '../office/engine/recorder.js'
 
 interface BottomToolbarProps {
   isEditMode: boolean
@@ -28,6 +29,15 @@ interface BottomToolbarProps {
   onToggleSettings: () => void
   isBehaviorEditorOpen: boolean
   onToggleBehaviorEditor: () => void
+  // 錄製/回放
+  recorderState: RecordingState
+  recordingDuration: number
+  playbackProgress: number
+  onStartRecording: () => void
+  onStopRecording: () => void
+  onStopPlayback: () => void
+  onOpenRecordingList: () => void
+  onSeekPlayback: (progress: number) => void
 }
 
 const panelStyle: React.CSSProperties = {
@@ -86,6 +96,14 @@ export const BottomToolbar = memo(function BottomToolbar({
   onToggleSettings,
   isBehaviorEditorOpen,
   onToggleBehaviorEditor,
+  recorderState,
+  recordingDuration,
+  playbackProgress,
+  onStartRecording,
+  onStopRecording,
+  onStopPlayback,
+  onOpenRecordingList,
+  onSeekPlayback,
 }: BottomToolbarProps) {
   const [hovered, setHovered] = useState<string | null>(null)
 
@@ -202,6 +220,66 @@ export const BottomToolbar = memo(function BottomToolbar({
           onUiScaleChange={onUiScaleChange}
           lanPeers={lanPeers}
         />
+      </div>
+      {/* 錄製/回放控制 */}
+      <div style={{ borderLeft: '1px solid var(--pixel-border)', paddingLeft: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+        {recorderState === 'idle' && (
+          <>
+            <button
+              onClick={onStartRecording}
+              onMouseEnter={() => setHovered('rec')}
+              onMouseLeave={() => setHovered(null)}
+              style={{ ...btnBase, color: '#ff6b6b', background: hovered === 'rec' ? 'var(--pixel-btn-hover-bg)' : btnBase.background }}
+              title={t.recording}
+            >
+              {'\u25CF'}
+            </button>
+            <button
+              onClick={onOpenRecordingList}
+              onMouseEnter={() => setHovered('reclist')}
+              onMouseLeave={() => setHovered(null)}
+              style={{ ...btnBase, background: hovered === 'reclist' ? 'var(--pixel-btn-hover-bg)' : btnBase.background }}
+              title={t.recordingList}
+            >
+              {'\u25B6'}
+            </button>
+          </>
+        )}
+        {recorderState === 'recording' && (
+          <>
+            <button
+              onClick={onStopRecording}
+              style={{ ...btnBase, color: '#ff6b6b' }}
+              title={t.stopRecording}
+            >
+              {'\u25A0'}
+            </button>
+            <span style={{ fontSize: '20px', color: '#ff6b6b', minWidth: 48 }}>
+              {t.recordingDuration(recordingDuration)}
+            </span>
+          </>
+        )}
+        {recorderState === 'playing' && (
+          <>
+            <button
+              onClick={onStopPlayback}
+              style={{ ...btnBase, color: 'var(--pixel-accent)' }}
+              title={t.stopPlayback}
+            >
+              {'\u25A0'}
+            </button>
+            <div
+              style={{ width: 80, height: 12, background: 'var(--pixel-btn-bg)', border: '1px solid var(--pixel-border)', cursor: 'pointer', position: 'relative' }}
+              onClick={e => {
+                const rect = e.currentTarget.getBoundingClientRect()
+                onSeekPlayback((e.clientX - rect.left) / rect.width)
+              }}
+            >
+              <div style={{ width: `${playbackProgress * 100}%`, height: '100%', background: 'var(--pixel-accent)' }} />
+            </div>
+            <span style={{ fontSize: '18px', color: 'var(--pixel-text-dim)' }}>{t.playback}</span>
+          </>
+        )}
       </div>
       {!isBuildingViewOpen && (
         <FloorSelector

@@ -261,3 +261,8 @@ export const TEAM_BADGE_VERTICAL_OFFSET_PX = 30
 export const TEAM_CONNECTION_LINE_ALPHA = 0.3
 export const TEAM_CONNECTION_LINE_WIDTH = 1
 export const TEAM_CONNECTION_DASH: [number, number] = [3, 3]
+
+// ── 錄製/回放 ────────────────────────────────────────────────
+export const RECORDING_FPS = 24
+export const RECORDING_KEYFRAME_INTERVAL_FRAMES = 120  // 每 5 秒（24fps × 5s）
+export const RECORDING_MAX_DURATION_SEC = 600          // 最長 10 分鐘

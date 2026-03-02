@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback } from 'react'
 import type { OfficeState } from '../engine/officeState.js'
 import type { EditorState } from '../editor/editorState.js'
 import type { EditorRenderState, SelectionRenderState, DeleteButtonBounds, RotateButtonBounds, MinimapBounds } from '../engine/renderer.js'
+import type { Recorder } from '../engine/recorder.js'
 import { startGameLoop } from '../engine/gameLoop.js'
 import { renderFrame, renderMinimap } from '../engine/renderer.js'
 import { TILE_SIZE, EditTool } from '../types.js'
@@ -30,9 +31,10 @@ interface OfficeCanvasProps {
   dayNightEnabled?: boolean
   dayNightTimeOverride?: number | null
   onContextMenu?: (agentId: number, x: number, y: number) => void
+  recorder?: Recorder | null
 }
 
-export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, onEditorTileAction, onEditorEraseAction, onEditorSelectionChange, onDeleteSelected, onRotateSelected, onDragMove, editorTick: _editorTick, zoom, onZoomChange, panRef, dayNightEnabled, dayNightTimeOverride, onContextMenu: onContextMenuProp }: OfficeCanvasProps) {
+export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, onEditorTileAction, onEditorEraseAction, onEditorSelectionChange, onDeleteSelected, onRotateSelected, onDragMove, editorTick: _editorTick, zoom, onZoomChange, panRef, dayNightEnabled, dayNightTimeOverride, onContextMenu: onContextMenuProp, recorder }: OfficeCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const offsetRef = useRef({ x: 0, y: 0 })
@@ -59,6 +61,10 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
   // 觸控長按
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null)
+  // 錄製/回放
+  const recorderRef = useRef(recorder)
+  recorderRef.current = recorder
+  const gameTimeRef = useRef(0)
 
   // 限制平移範圍，使地圖邊緣不會超出視窗內的邊距
   const clampPan = useCallback((px: number, py: number): { x: number; y: number } => {
@@ -112,7 +118,17 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
         } else {
           officeState.setDayPhase('day')
         }
-        officeState.update(dt)
+        // 錄製/回放整合
+        const rec = recorderRef.current
+        if (rec?.state === 'playing') {
+          rec.playbackTick(dt, officeState)
+        } else {
+          officeState.update(dt)
+          if (rec?.state === 'recording') {
+            gameTimeRef.current += dt
+            rec.recordTick(gameTimeRef.current, officeState)
+          }
+        }
       },
       render: (ctx) => {
         // Canvas 尺寸為裝置像素
