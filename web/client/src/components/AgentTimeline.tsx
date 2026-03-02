@@ -8,8 +8,6 @@ interface AgentTimelineProps {
 }
 
 const TIMELINE_WINDOW_MS = 5 * 60 * 1000
-const BAR_HEIGHT = 12
-const ROW_GAP = 2
 const MAX_TOOLS = 20
 
 function getHexColor(toolName: string): string {
@@ -29,43 +27,42 @@ export const AgentTimeline = memo(function AgentTimeline({ tools }: AgentTimelin
 
   if (recentTools.length === 0) return null
 
-  const totalHeight = recentTools.length * (BAR_HEIGHT + ROW_GAP)
-
   return (
-    <div style={{ position: 'relative', height: totalHeight, overflow: 'hidden' }}>
-      {recentTools.map((tool, i) => {
+    <div style={{
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: 3,
+      maxHeight: 120,
+      overflowY: 'auto',
+    }}>
+      {recentTools.map((tool) => {
         const name = extractToolName(tool.status) || tool.status
-        const start = Math.max(tool.startTime, windowStart)
         const end = tool.endTime ?? now
-        const left = ((start - windowStart) / TIMELINE_WINDOW_MS) * 100
-        const width = Math.max(1, ((end - start) / TIMELINE_WINDOW_MS) * 100)
         const color = getHexColor(name)
-        const elapsed = ((end - tool.startTime) / 1000).toFixed(1)
+        const elapsedSec = (end - tool.startTime) / 1000
+        const elapsed = elapsedSec < 10 ? elapsedSec.toFixed(1) : Math.round(elapsedSec)
         const isActive = !tool.done
 
         return (
           <div
             key={tool.toolId}
-            title={`${name} (${elapsed}s)`}
+            title={`${name} (${((end - tool.startTime) / 1000).toFixed(1)}s)`}
             style={{
-              position: 'absolute',
-              left: `${left}%`,
-              width: `${width}%`,
-              top: i * (BAR_HEIGHT + ROW_GAP),
-              height: BAR_HEIGHT,
+              display: 'inline-flex',
+              alignItems: 'center',
+              height: 16,
+              padding: '2px 4px',
               background: color,
               border: '1px solid var(--pixel-border)',
               opacity: isActive ? 1 : 0.7,
               animation: isActive ? 'chatPulse 1s ease-in-out infinite' : undefined,
-              overflow: 'hidden',
               whiteSpace: 'nowrap',
-              fontSize: '9px',
-              lineHeight: `${BAR_HEIGHT}px`,
-              paddingLeft: 2,
+              fontSize: 10,
+              lineHeight: '12px',
               color: '#fff',
             }}
           >
-            {name}
+            {name} {elapsed}s
           </div>
         )
       })}
