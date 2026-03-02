@@ -47,6 +47,7 @@ import { setupAgentNodeNamespace } from './agentNodeHandler.js';
 import { loadDashboardStats, getDashboardStats, flushDashboardStats } from './dashboardStats.js';
 import { startLanDiscovery, stopLanDiscovery, getLanPeers, isLanDiscoveryRunning } from './lanDiscovery.js';
 import { LAN_DISCOVERY_HEARTBEAT_MS } from './constants.js';
+import { readBehaviorSettings, writeBehaviorSettings } from './behaviorSettingsStore.js';
 import { WebSocketServer } from 'ws';
 import type { WebSocket } from 'ws';
 import { createTerminalPty, trackPty, cleanupAllTerminals } from './terminalManager.js';
@@ -623,6 +624,9 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 				sender.postMessage({ type: 'lanPeers', peers });
 			}
 
+			// 傳送行為參數設定
+			sender.postMessage({ type: 'behaviorSettingsLoaded', settings: readBehaviorSettings() });
+
 			// 傳送當前樓層的現有代理
 			const agentMeta = readJsonFile<Record<string, { palette?: number; hueShift?: number; seatId?: string }>>(
 				getAgentSeatsPath(), {},
@@ -1012,6 +1016,16 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 					type: 'agentToolPermissionClear', id: agentId,
 				});
 			}
+			break;
+		}
+		case 'saveBehaviorSettings': {
+			const merged = writeBehaviorSettings(msg.settings);
+			// 廣播給所有客戶端
+			ctx.sender?.postMessage({ type: 'behaviorSettingsLoaded', settings: merged });
+			break;
+		}
+		case 'requestBehaviorSettings': {
+			sender.postMessage({ type: 'behaviorSettingsLoaded', settings: readBehaviorSettings() });
 			break;
 		}
 		case 'requestDashboardData': {

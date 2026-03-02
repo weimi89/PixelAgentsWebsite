@@ -12,6 +12,7 @@ import { setCharacterTemplates } from '../office/sprites/spriteData.js'
 import { vscode, onServerMessage } from '../socketApi.js'
 import { playWaitingSound, playPermissionSound, playTurnCompleteSound, setSoundEnabled, setSoundConfig } from '../notificationSound.js'
 import { TEAM_COLORS } from '../constants.js'
+import { setBehaviorConfig } from '../office/engine/behaviorConfig.js'
 
 /** 從 Record<number, T> 中移除指定鍵，若鍵不存在則回傳原始物件（避免不必要的重渲染） */
 function removeKey<T>(prev: Record<number, T>, id: number): Record<number, T> {
@@ -573,6 +574,10 @@ function handleLanPeers(msg: ServerMessage & { type: 'lanPeers' }, ctx: HandlerC
   ctx.setLanPeers(msg.peers)
 }
 
+function handleBehaviorSettingsLoaded(msg: ServerMessage & { type: 'behaviorSettingsLoaded' }): void {
+  setBehaviorConfig(msg.settings as Record<string, number>)
+}
+
 function handleFloorSwitched(msg: ServerMessage & { type: 'floorSwitched' }, ctx: HandlerContext): void {
   ctx.setCurrentFloorId(msg.floorId)
   // 清空當前代理相關狀態，新樓層的資料會隨 existingAgents + layoutLoaded 到來
@@ -638,6 +643,7 @@ const messageHandlers: Record<string, HandlerFn> = {
   statusHistory: handleStatusHistory as HandlerFn,
   agentTeam: handleAgentTeam as HandlerFn,
   lanPeers: handleLanPeers as HandlerFn,
+  behaviorSettingsLoaded: handleBehaviorSettingsLoaded as HandlerFn,
 }
 
 // ── Hook ────────────────────────────────────────────────────────

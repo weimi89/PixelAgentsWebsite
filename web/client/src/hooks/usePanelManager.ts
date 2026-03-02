@@ -13,6 +13,7 @@ export interface PanelManagerState {
   isSessionPickerOpen: boolean
   isBuildingViewOpen: boolean
   isDashboardView: boolean
+  isBehaviorEditorOpen: boolean
   sessions: SessionInfo[]
   isLoadingSessions: boolean
   closeAllPanels: () => void
@@ -21,6 +22,7 @@ export interface PanelManagerState {
   handleSwitchFloor: (floorId: string) => void
   handleOpenSessionPicker: () => void
   handleToggleSettings: () => void
+  handleToggleBehaviorEditor: () => void
   handleResumeSession: (sessionId: string, projectDir: string) => void
   handleExcludeProject: (dirBasename: string) => void
   handleIncludeProject: (dirBasename: string) => void
@@ -38,6 +40,7 @@ export function usePanelManager({ isEditMode, handleToggleEditMode }: PanelManag
   const [isSessionPickerOpen, setIsSessionPickerOpen] = useState(false)
   const [isBuildingViewOpen, setIsBuildingViewOpen] = useState(false)
   const [isDashboardView, setIsDashboardView] = useState(false)
+  const [isBehaviorEditorOpen, setIsBehaviorEditorOpen] = useState(false)
   const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [isLoadingSessions, setIsLoadingSessions] = useState(false)
 
@@ -47,6 +50,7 @@ export function usePanelManager({ isEditMode, handleToggleEditMode }: PanelManag
     setIsSessionPickerOpen(false)
     setIsBuildingViewOpen(false)
     setIsDashboardView(false)
+    setIsBehaviorEditorOpen(false)
     if (isEditMode) handleToggleEditMode()
   }, [isEditMode, handleToggleEditMode])
 
@@ -57,6 +61,7 @@ export function usePanelManager({ isEditMode, handleToggleEditMode }: PanelManag
       setIsSessionPickerOpen(false)
       setIsBuildingViewOpen(false)
       setIsDashboardView(false)
+      setIsBehaviorEditorOpen(false)
     }
     handleToggleEditMode()
   }, [isEditMode, handleToggleEditMode])
@@ -110,6 +115,15 @@ export function usePanelManager({ isEditMode, handleToggleEditMode }: PanelManag
     vscode.postMessage({ type: 'listProjectDirs' })
   }, [])
 
+  const handleToggleBehaviorEditor = useCallback(() => {
+    if (isBehaviorEditorOpen) {
+      setIsBehaviorEditorOpen(false)
+    } else {
+      closeAllPanels()
+      setIsBehaviorEditorOpen(true)
+    }
+  }, [isBehaviorEditorOpen, closeAllPanels])
+
   const handleToggleDashboardView = useCallback(() => {
     if (isDashboardView) {
       setIsDashboardView(false)
@@ -136,6 +150,7 @@ export function usePanelManager({ isEditMode, handleToggleEditMode }: PanelManag
     isSessionPickerOpen,
     isBuildingViewOpen,
     isDashboardView,
+    isBehaviorEditorOpen,
     sessions,
     isLoadingSessions,
     closeAllPanels,
@@ -144,6 +159,7 @@ export function usePanelManager({ isEditMode, handleToggleEditMode }: PanelManag
     handleSwitchFloor,
     handleOpenSessionPicker,
     handleToggleSettings,
+    handleToggleBehaviorEditor,
     handleResumeSession,
     handleExcludeProject,
     handleIncludeProject,

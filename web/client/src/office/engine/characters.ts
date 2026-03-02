@@ -6,14 +6,8 @@ import {
   WALK_SPEED_PX_PER_SEC,
   WALK_FRAME_DURATION_SEC,
   TYPE_FRAME_DURATION_SEC,
-  WANDER_PAUSE_MIN_SEC,
-  WANDER_PAUSE_MAX_SEC,
   WANDER_MOVES_BEFORE_REST_MIN,
   WANDER_MOVES_BEFORE_REST_MAX,
-  SEAT_REST_MIN_SEC,
-  SEAT_REST_MAX_SEC,
-  CHAT_DURATION_MIN_SEC,
-  CHAT_DURATION_MAX_SEC,
   CHAT_PROXIMITY_TILES,
   INTERACT_DURATION_MIN_SEC,
   INTERACT_DURATION_MAX_SEC,
@@ -21,27 +15,19 @@ import {
   STRETCH_DURATION_SEC,
   USE_WALL_DURATION_MIN_SEC,
   USE_WALL_DURATION_MAX_SEC,
-  SLEEP_TRIGGER_IDLE_SEC,
-  STRETCH_TRIGGER_SIT_SEC,
   EMOTE_DISPLAY_DURATION_SEC,
   SLEEP_ZZZ_REFRESH_SEC,
-  WANDER_WEIGHT_IDLE_LOOK,
-  WANDER_WEIGHT_RANDOM,
-  WANDER_WEIGHT_FURNITURE,
-  WANDER_WEIGHT_CHAT,
-  WANDER_WEIGHT_WALL,
-  WANDER_WEIGHT_MEETING,
   WANDER_RANDOM_RADIUS,
   WANDER_MAX_PATH_STEPS,
   MEETING_MIN_PARTICIPANTS,
   MEETING_DURATION_MIN_SEC,
   MEETING_DURATION_MAX_SEC,
   MEETING_SEAT_SEARCH_RADIUS,
-  FURNITURE_COOLDOWN_SEC,
   FURNITURE_WEIGHT_DECAY,
   FURNITURE_VISIT_HISTORY_MAX,
   SIT_WANDER_BONUS_MAX,
 } from '../../constants.js'
+import { getBehaviorConfig } from './behaviorConfig.js'
 
 /** 顯示閱讀動畫而非打字動畫的工具 */
 const READING_TOOLS = new Set(['Read', 'Grep', 'Glob', 'WebFetch', 'WebSearch'])
@@ -186,13 +172,14 @@ function pickWanderAction(
   ch: Character,
   ctx: UpdateContext,
 ): { type: WanderActionType; target?: { col: number; row: number }; furnitureType?: string; chatTarget?: number } {
+  const cfg = getBehaviorConfig()
   const weights: Array<{ type: WanderActionType; weight: number; target?: { col: number; row: number }; furnitureType?: string; chatTarget?: number }> = []
 
   // 站著看看（只轉方向，不移動）
-  weights.push({ type: 'idle_look', weight: WANDER_WEIGHT_IDLE_LOOK })
+  weights.push({ type: 'idle_look', weight: cfg.wanderWeightIdleLook })
 
   // 隨機漫遊
-  weights.push({ type: 'random', weight: WANDER_WEIGHT_RANDOM })
+  weights.push({ type: 'random', weight: cfg.wanderWeightRandom })
 
   // 互動家具（限制在 8 格範圍內）
   let closestFurniture: { col: number; row: number; type: string } | null = null
@@ -211,9 +198,9 @@ function pickWanderAction(
     const fUid = ctx.furnitureUidMap.get(fKey)
     const lastVisit = fUid ? (ch.recentFurnitureVisits.get(fUid) ?? -Infinity) : -Infinity
     const timeSinceVisit = ch.gameTime - lastVisit
-    const fWeight = timeSinceVisit < FURNITURE_COOLDOWN_SEC
-      ? Math.round(WANDER_WEIGHT_FURNITURE * FURNITURE_WEIGHT_DECAY)
-      : WANDER_WEIGHT_FURNITURE
+    const fWeight = timeSinceVisit < cfg.furnitureCooldown
+      ? Math.round(cfg.wanderWeightFurniture * FURNITURE_WEIGHT_DECAY)
+      : cfg.wanderWeightFurniture
     weights.push({ type: 'furniture', weight: fWeight, target: { col: closestFurniture.col, row: closestFurniture.row }, furnitureType: closestFurniture.type })
   }
 
@@ -232,7 +219,7 @@ function pickWanderAction(
     }
   }
   if (closestChat) {
-    weights.push({ type: 'chat', weight: WANDER_WEIGHT_CHAT, target: { col: closestChat.col, row: closestChat.row }, chatTarget: closestChat.id })
+    weights.push({ type: 'chat', weight: cfg.wanderWeightChat, target: { col: closestChat.col, row: closestChat.row }, chatTarget: closestChat.id })
   }
 
   // 白板（限制在 8 格範圍內）
@@ -252,9 +239,9 @@ function pickWanderAction(
     const wUid = ctx.furnitureUidMap.get(wKey)
     const wLastVisit = wUid ? (ch.recentFurnitureVisits.get(wUid) ?? -Infinity) : -Infinity
     const wTimeSince = ch.gameTime - wLastVisit
-    const wWeight = wTimeSince < FURNITURE_COOLDOWN_SEC
-      ? Math.round(WANDER_WEIGHT_WALL * FURNITURE_WEIGHT_DECAY)
-      : WANDER_WEIGHT_WALL
+    const wWeight = wTimeSince < cfg.furnitureCooldown
+      ? Math.round(cfg.wanderWeightWall * FURNITURE_WEIGHT_DECAY)
+      : cfg.wanderWeightWall
     weights.push({ type: 'wall', weight: wWeight, target: { col: closestWall.col, row: closestWall.row }, furnitureType: closestWall.type })
   }
 
@@ -279,7 +266,7 @@ function pickWanderAction(
         if (d <= 8) nearbyIdle++
       }
       if (nearbyIdle >= MEETING_MIN_PARTICIPANTS - 1) {
-        weights.push({ type: 'meeting', weight: WANDER_WEIGHT_MEETING, target: { col: closestMeeting.col, row: closestMeeting.row }, furnitureType: closestMeeting.type })
+        weights.push({ type: 'meeting', weight: cfg.wanderWeightMeeting, target: { col: closestMeeting.col, row: closestMeeting.row }, furnitureType: closestMeeting.type })
       }
     }
   }
@@ -356,6 +343,7 @@ export function updateCharacter(
   dt: number,
   ctx: UpdateContext,
 ): void {
+  const cfg = getBehaviorConfig()
   ch.frameTimer += dt
   ch.gameTime += dt
 
@@ -388,7 +376,7 @@ export function updateCharacter(
         ch.seatTimer = 0 // 清除哨兵值
 
         // 檢查是否觸發伸展（久坐 3 分鐘）
-        if (ch.sitTimer >= STRETCH_TRIGGER_SIT_SEC) {
+        if (ch.sitTimer >= cfg.stretchTrigger) {
           ch.state = CharacterState.STRETCH
           ch.behaviorTimer = STRETCH_DURATION_SEC
           ch.frame = 0
@@ -399,14 +387,14 @@ export function updateCharacter(
         }
 
         // 久坐後額外漫遊次數（按坐姿時間比例，最多 SIT_WANDER_BONUS_MAX）
-        const sitRatio = Math.min(1, ch.sitTimer / STRETCH_TRIGGER_SIT_SEC)
+        const sitRatio = Math.min(1, ch.sitTimer / cfg.stretchTrigger)
         const sitBonus = Math.floor(sitRatio * SIT_WANDER_BONUS_MAX)
         ch.state = CharacterState.IDLE
         ch.frame = 0
         ch.frameTimer = 0
         ch.sitTimer = 0
         ch.sleepTimer = 0
-        ch.wanderTimer = randomRange(WANDER_PAUSE_MIN_SEC, WANDER_PAUSE_MAX_SEC)
+        ch.wanderTimer = randomRange(cfg.wanderPauseMin, cfg.wanderPauseMax)
         ch.wanderCount = 0
         ch.wanderLimit = randomInt(WANDER_MOVES_BEFORE_REST_MIN, WANDER_MOVES_BEFORE_REST_MAX) + sitBonus
       }
@@ -451,7 +439,7 @@ export function updateCharacter(
         const seat = ctx.seats.get(ch.seatId)
         if (seat && ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
           ch.sleepTimer += dt
-          if (ch.sleepTimer >= SLEEP_TRIGGER_IDLE_SEC) {
+          if (ch.sleepTimer >= cfg.sleepTrigger) {
             ch.state = CharacterState.SLEEP
             ch.frame = 0
             ch.frameTimer = 0
@@ -474,7 +462,7 @@ export function updateCharacter(
               if (ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
                 ch.state = CharacterState.TYPE
                 ch.dir = seat.facingDir
-                ch.seatTimer = randomRange(SEAT_REST_MIN_SEC, SEAT_REST_MAX_SEC)
+                ch.seatTimer = randomRange(cfg.seatRestMin, cfg.seatRestMax)
                 ch.wanderCount = 0
                 ch.wanderLimit = randomInt(WANDER_MOVES_BEFORE_REST_MIN, WANDER_MOVES_BEFORE_REST_MAX)
                 ch.frame = 0
@@ -496,7 +484,7 @@ export function updateCharacter(
           // 沒有座位或找不到路徑 → 原地站立休息一段時間再重新漫遊
           ch.wanderCount = 0
           ch.wanderLimit = randomInt(WANDER_MOVES_BEFORE_REST_MIN, WANDER_MOVES_BEFORE_REST_MAX)
-          ch.wanderTimer = randomRange(SEAT_REST_MIN_SEC * 0.5, SEAT_REST_MAX_SEC * 0.5)
+          ch.wanderTimer = randomRange(cfg.seatRestMin * 0.5, cfg.seatRestMax * 0.5)
           break
         }
 
@@ -620,11 +608,11 @@ export function updateCharacter(
         // 無論是否成功行動，都重設漫遊計時器
         if (action.type === 'idle_look') {
           // 站著看看後短暫停頓
-          ch.wanderTimer = randomRange(WANDER_PAUSE_MIN_SEC * 0.5, WANDER_PAUSE_MIN_SEC * 1.5)
+          ch.wanderTimer = randomRange(cfg.wanderPauseMin * 0.5, cfg.wanderPauseMin * 1.5)
         } else {
           ch.wanderTimer = acted
-            ? randomRange(WANDER_PAUSE_MIN_SEC, WANDER_PAUSE_MAX_SEC)
-            : randomRange(WANDER_PAUSE_MAX_SEC * 0.5, WANDER_PAUSE_MAX_SEC)
+            ? randomRange(cfg.wanderPauseMin, cfg.wanderPauseMax)
+            : randomRange(cfg.wanderPauseMax * 0.5, cfg.wanderPauseMax)
         }
       }
       break
@@ -741,7 +729,7 @@ export function updateCharacter(
               if (ch.seatTimer < 0) {
                 ch.seatTimer = 0
               } else {
-                ch.seatTimer = randomRange(SEAT_REST_MIN_SEC, SEAT_REST_MAX_SEC)
+                ch.seatTimer = randomRange(cfg.seatRestMin, cfg.seatRestMax)
               }
               ch.wanderCount = 0
               ch.wanderLimit = randomInt(WANDER_MOVES_BEFORE_REST_MIN, WANDER_MOVES_BEFORE_REST_MAX)
@@ -751,7 +739,7 @@ export function updateCharacter(
             }
           }
           ch.state = CharacterState.IDLE
-          ch.wanderTimer = randomRange(WANDER_PAUSE_MIN_SEC, WANDER_PAUSE_MAX_SEC)
+          ch.wanderTimer = randomRange(cfg.wanderPauseMin, cfg.wanderPauseMax)
         }
         ch.frame = 0
         ch.frameTimer = 0
@@ -817,7 +805,7 @@ export function updateCharacter(
         ch.state = CharacterState.IDLE
         ch.frame = 0
         ch.frameTimer = 0
-        ch.wanderTimer = randomRange(WANDER_PAUSE_MIN_SEC, WANDER_PAUSE_MAX_SEC)
+        ch.wanderTimer = randomRange(cfg.wanderPauseMin, cfg.wanderPauseMax)
         ch.wanderCount = 0
         ch.wanderLimit = randomInt(WANDER_MOVES_BEFORE_REST_MIN, WANDER_MOVES_BEFORE_REST_MAX)
       }
@@ -835,7 +823,7 @@ export function updateCharacter(
         ch.state = CharacterState.IDLE
         ch.frame = 0
         ch.frameTimer = 0
-        ch.wanderTimer = randomRange(WANDER_PAUSE_MIN_SEC, WANDER_PAUSE_MAX_SEC)
+        ch.wanderTimer = randomRange(cfg.wanderPauseMin, cfg.wanderPauseMax)
         ch.wanderCount = 0
         ch.wanderLimit = randomInt(WANDER_MOVES_BEFORE_REST_MIN, WANDER_MOVES_BEFORE_REST_MAX)
       }
@@ -859,7 +847,7 @@ export function updateCharacter(
         ch.state = CharacterState.IDLE
         ch.frame = 0
         ch.frameTimer = 0
-        ch.wanderTimer = randomRange(WANDER_PAUSE_MIN_SEC, WANDER_PAUSE_MAX_SEC)
+        ch.wanderTimer = randomRange(cfg.wanderPauseMin, cfg.wanderPauseMax)
       }
       break
     }
@@ -875,7 +863,7 @@ export function updateCharacter(
         ch.state = CharacterState.IDLE
         ch.frame = 0
         ch.frameTimer = 0
-        ch.wanderTimer = randomRange(WANDER_PAUSE_MIN_SEC, WANDER_PAUSE_MAX_SEC)
+        ch.wanderTimer = randomRange(cfg.wanderPauseMin, cfg.wanderPauseMax)
       }
       break
     }
@@ -1005,7 +993,7 @@ export function updateCharacter(
         ch.meetingTableUid = null
         ch.frame = 0
         ch.frameTimer = 0
-        ch.wanderTimer = randomRange(WANDER_PAUSE_MIN_SEC, WANDER_PAUSE_MAX_SEC)
+        ch.wanderTimer = randomRange(cfg.wanderPauseMin, cfg.wanderPauseMax)
         setEmote(ch, EmoteType.STAR)
       }
       break
@@ -1051,7 +1039,8 @@ export function updateCharacter(
 
 /** 開始兩個角色的聊天 */
 function startChat(a: Character, b: Character): void {
-  const duration = randomRange(CHAT_DURATION_MIN_SEC, CHAT_DURATION_MAX_SEC)
+  const cfg = getBehaviorConfig()
+  const duration = randomRange(cfg.chatDurationMin, cfg.chatDurationMax)
   a.state = CharacterState.CHAT
   a.chatPartnerId = b.id
   a.behaviorTimer = duration
@@ -1067,6 +1056,7 @@ function startChat(a: Character, b: Character): void {
 
 /** 結束聊天 */
 function endChat(ch: Character, allCharacters: Map<number, Character>): void {
+  const cfg = getBehaviorConfig()
   if (ch.chatPartnerId !== null) {
     const partner = allCharacters.get(ch.chatPartnerId)
     if (partner && partner.state === CharacterState.CHAT) {
@@ -1074,14 +1064,14 @@ function endChat(ch: Character, allCharacters: Map<number, Character>): void {
       partner.chatPartnerId = null
       partner.frame = 0
       partner.frameTimer = 0
-      partner.wanderTimer = randomRange(WANDER_PAUSE_MIN_SEC, WANDER_PAUSE_MAX_SEC)
+      partner.wanderTimer = randomRange(cfg.wanderPauseMin, cfg.wanderPauseMax)
     }
   }
   ch.state = CharacterState.IDLE
   ch.chatPartnerId = null
   ch.frame = 0
   ch.frameTimer = 0
-  ch.wanderTimer = randomRange(WANDER_PAUSE_MIN_SEC, WANDER_PAUSE_MAX_SEC)
+  ch.wanderTimer = randomRange(cfg.wanderPauseMin, cfg.wanderPauseMax)
 }
 
 /** 找到會議桌旁的可用座位（考慮其他角色佔用） */

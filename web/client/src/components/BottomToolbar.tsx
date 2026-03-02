@@ -26,6 +26,8 @@ interface BottomToolbarProps {
   lanPeers: Array<{ name: string; host: string; port: number; agentCount: number }>
   isSettingsOpen: boolean
   onToggleSettings: () => void
+  isBehaviorEditorOpen: boolean
+  onToggleBehaviorEditor: () => void
 }
 
 const panelStyle: React.CSSProperties = {
@@ -82,6 +84,8 @@ export const BottomToolbar = memo(function BottomToolbar({
   lanPeers,
   isSettingsOpen,
   onToggleSettings,
+  isBehaviorEditorOpen,
+  onToggleBehaviorEditor,
 }: BottomToolbarProps) {
   const [hovered, setHovered] = useState<string | null>(null)
 
@@ -132,6 +136,23 @@ export const BottomToolbar = memo(function BottomToolbar({
         title={t.browseSessions}
       >
         {t.sessions}
+      </button>
+      <button
+        onClick={onToggleBehaviorEditor}
+        onMouseEnter={() => setHovered('behavior')}
+        onMouseLeave={() => setHovered(null)}
+        aria-pressed={isBehaviorEditorOpen}
+        style={
+          isBehaviorEditorOpen
+            ? { ...btnActive }
+            : {
+                ...btnBase,
+                background: hovered === 'behavior' ? 'var(--pixel-btn-hover-bg)' : btnBase.background,
+              }
+        }
+        title={t.behaviorEditor}
+      >
+        {t.behavior}
       </button>
       <button
         onClick={onToggleEditMode}

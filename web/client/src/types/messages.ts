@@ -99,3 +99,4 @@ export type ServerMessage =
   | { type: 'statusHistory'; id: number; history: Array<{ ts: number; status: string; detail?: string }> }
   | { type: 'agentTeam'; id: number; teamName: string | null }
   | { type: 'lanPeers'; peers: Array<{ name: string; host: string; port: number; agentCount: number }> }
+  | { type: 'behaviorSettingsLoaded'; settings: Record<string, number> }

@@ -104,7 +104,9 @@ export type ClientMessage =
 	| { type: 'setLanDiscoveryEnabled'; enabled: boolean }
 	| { type: 'setLanPeerName'; name: string }
 	| { type: 'approvePermission'; agentId: number }
-	| { type: 'approveAllPermissions' };
+	| { type: 'approveAllPermissions' }
+	| { type: 'saveBehaviorSettings'; settings: Record<string, number> }
+	| { type: 'requestBehaviorSettings' };
 
 /** 代理上下文 — 集中管理所有共享狀態與計時器，避免函式傳遞大量參數 */
 export interface AgentContext {

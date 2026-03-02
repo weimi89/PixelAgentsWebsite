@@ -26,6 +26,7 @@ import { AgentDetailPanel } from './components/AgentDetailPanel.js'
 import { ContextMenu } from './components/ContextMenu.js'
 import type { ContextMenuAction } from './components/ContextMenu.js'
 import { TerminalPanel } from './components/TerminalPanel.js'
+import { BehaviorEditorModal } from './components/BehaviorEditorModal.js'
 import { Dashboard } from './pages/Dashboard.js'
 import { t } from './i18n.js'
 
@@ -325,6 +326,8 @@ function App() {
         lanPeers={lanPeers}
         isSettingsOpen={panels.isSettingsOpen}
         onToggleSettings={panels.handleToggleSettings}
+        isBehaviorEditorOpen={panels.isBehaviorEditorOpen}
+        onToggleBehaviorEditor={panels.handleToggleBehaviorEditor}
       />
 
       <SessionPicker
@@ -345,6 +348,11 @@ function App() {
         currentFloorId={currentFloorId}
         floorSummaries={floorSummaries}
         onSwitchFloor={panels.handleSwitchFloor}
+      />
+
+      <BehaviorEditorModal
+        isOpen={panels.isBehaviorEditorOpen}
+        onClose={panels.handleToggleBehaviorEditor}
       />
 
       <ChatPanel messages={chatMessages} />
