@@ -211,6 +211,7 @@ export const LONG_PRESS_DURATION_MS = 500
 
 // ── 快取限制 ────────────────────────────────────────────────
 export const COLORIZE_CACHE_MAX_SIZE = 256
+export const SPRITE_CACHE_MAX_ENTRIES = 64
 export const SPRITE_CACHE_MAX_ZOOM_LEVELS = 12
 
 // ── 團隊視覺化 ────────────────────────────────────────────────

@@ -113,6 +113,7 @@ function handleAgentNodeEvent(
 			ctx.agents.set(id, agent);
 			ctx.remoteAgentMap.set(event.sessionId, id);
 			socket.data.ownedSessions.add(event.sessionId);
+			ctx.incrementFloorCount(floorId);
 			ctx.persistAgents();
 
 			console.log(`[Pixel Agents] Remote agent ${id} started: ${event.projectName} (owner: ${username}, floor: ${floorId})`);

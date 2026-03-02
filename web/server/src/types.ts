@@ -132,4 +132,8 @@ export interface AgentContext {
 	remoteAgentMap: Map<string, number>;
 	/** agentId → 進度訊號延長計時器次數（用於自適應權限偵測，限制最多 N 次） */
 	progressExtensions: Map<number, number>;
+	/** 增量更新樓層代理計數（代理建立時呼叫） */
+	incrementFloorCount: (floorId: FloorId) => void;
+	/** 增量更新樓層代理計數（代理移除時呼叫） */
+	decrementFloorCount: (floorId: FloorId) => void;
 }

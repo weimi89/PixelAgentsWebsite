@@ -2,7 +2,7 @@
 export const JSONL_POLL_INTERVAL_MS = 1000;
 export const JSONL_POLL_TIMEOUT_MS = 30_000; // 30 秒 — JSONL 輪詢最大等待時間
 export const FILE_WATCHER_POLL_INTERVAL_MS = 2000;
-export const PROJECT_SCAN_INTERVAL_MS = 1000;
+export const PROJECT_SCAN_INTERVAL_MS = 3000; // 3s（fs.watch 已提供即時變更通知，掃描僅作新會話發現）
 export const TOOL_DONE_DELAY_MS = 300;
 export const PERMISSION_TIMER_DELAY_MS = 7000;
 export const PERMISSION_TIMER_BASH_MS = 15000;

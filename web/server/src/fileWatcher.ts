@@ -170,6 +170,7 @@ function scanAndAdopt(
 		};
 		agents.set(id, agent);
 		ctx.trackedJsonlFiles.set(file, id);
+		ctx.incrementFloorCount(floorId);
 		persistAgents();
 		console.log(`[Pixel Agents] Auto-adopted session: ${path.basename(file)} → Agent ${id} (floor: ${floorId})`);
 		const isExternal = projectDir !== ctx.ownProjectDir;

@@ -1,6 +1,7 @@
 import type { Direction, SpriteData, FloorColor } from '../types.js'
 import { Direction as Dir } from '../types.js'
 import { adjustSprite } from '../colorize.js'
+import { SPRITE_CACHE_MAX_ENTRIES } from '../../constants.js'
 
 // ── 色彩調色盤 ──────────────────────────────────────────────
 const _ = '' // 透明
@@ -2148,7 +2149,12 @@ function hueShiftSprites(sprites: CharacterSprites, hueShift: number): Character
 export function getCharacterSprites(paletteIndex: number, hueShift = 0): CharacterSprites {
   const cacheKey = `${paletteIndex}:${hueShift}`
   const cached = spriteCache.get(cacheKey)
-  if (cached) return cached
+  if (cached) {
+    // LRU：移到最新位置
+    spriteCache.delete(cacheKey)
+    spriteCache.set(cacheKey, cached)
+    return cached
+  }
 
   let sprites: CharacterSprites
 
@@ -2214,5 +2220,10 @@ export function getCharacterSprites(paletteIndex: number, hueShift = 0): Charact
   }
 
   spriteCache.set(cacheKey, sprites)
+  // 超過限制時淘汰最舊的條目
+  if (spriteCache.size > SPRITE_CACHE_MAX_ENTRIES) {
+    const oldest = spriteCache.keys().next().value!
+    spriteCache.delete(oldest)
+  }
   return sprites
 }

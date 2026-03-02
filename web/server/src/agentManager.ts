@@ -245,6 +245,7 @@ function spawnCliAgent(
 	agents.set(id, agent);
 	ctx.trackedJsonlFiles.set(agent.jsonlFile, id);
 	activeAgentIdRef.current = id;
+	ctx.incrementFloorCount(floorId);
 	persistAgents();
 	console.log(`[Pixel Agents] Agent ${id}: ${label} (floor: ${floorId})`);
 	const isExternal = projectDir !== ctx.ownProjectDir;
@@ -335,6 +336,7 @@ export function removeAgent(
 	if (agent.remoteSessionId) {
 		ctx.remoteAgentMap.delete(agent.remoteSessionId);
 	}
+	ctx.decrementFloorCount(agent.floorId);
 	agents.delete(agentId);
 	persistAgents();
 }
@@ -432,6 +434,7 @@ export function recoverTmuxAgents(
 		agent.fileOffset = 0;
 		agents.set(id, agent);
 		ctx.trackedJsonlFiles.set(agent.jsonlFile, id);
+		ctx.incrementFloorCount(floorId);
 
 		console.log(`[Pixel Agents] Recovered tmux agent ${id}: ${sessionName} (floor: ${floorId}, cli: ${cliType})`);
 		const isExternal = projectDir !== ctx.ownProjectDir;

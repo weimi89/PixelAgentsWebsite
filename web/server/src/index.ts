@@ -149,6 +149,7 @@ console.log(`[Pixel Agents] Own project dir: ${ownProjectDir}`);
 // ── 樓層 / 建築物 ──────────────────────────────────────────
 const socketFloors = new Map<string, FloorId>();
 const building = loadBuildingConfig();
+const floorAgentCounts = new Map<string, number>();
 console.log(`[Pixel Agents] Building: ${building.floors.length} floor(s), default=${building.defaultFloorId}`);
 
 /** 暫時的 sender 佔位 — 在 socket 連線時更新 */
@@ -171,6 +172,14 @@ const ctx: AgentContext = {
 	broadcastFloorSummaries: () => {}, // 佔位，main() 中替換
 	remoteAgentMap: new Map(),
 	progressExtensions: new Map(),
+	incrementFloorCount: (floorId: FloorId) => {
+		floorAgentCounts.set(floorId, (floorAgentCounts.get(floorId) || 0) + 1);
+	},
+	decrementFloorCount: (floorId: FloorId) => {
+		const count = (floorAgentCounts.get(floorId) || 0) - 1;
+		if (count <= 0) floorAgentCounts.delete(floorId);
+		else floorAgentCounts.set(floorId, count);
+	},
 };
 
 // ── tmux 健康檢查 ───────────────────────────────────────
@@ -265,15 +274,16 @@ async function main(): Promise<void> {
 		},
 	});
 
+	// 從已恢復的代理初始化樓層計數器
+	for (const agent of agents.values()) {
+		ctx.incrementFloorCount(agent.floorId);
+	}
+
 	// 各樓層代理數量摘要廣播
 	ctx.broadcastFloorSummaries = () => {
-		const counts = new Map<string, number>();
-		for (const agent of agents.values()) {
-			counts.set(agent.floorId, (counts.get(agent.floorId) || 0) + 1);
-		}
 		const summaries = ctx.building.floors.map((f) => ({
 			floorId: f.id,
-			agentCount: counts.get(f.id) || 0,
+			agentCount: floorAgentCounts.get(f.id) || 0,
 		}));
 		ctx.sender?.postMessage({ type: 'floorSummaries', summaries });
 	};
@@ -801,11 +811,13 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 				// 清理該樓層的聊天歷史
 				chatHistory.delete(msg.floorId);
 
-				// 將該樓層的代理遷移至預設樓層
+				// 將該樓層的代理遷移至預設樓層（更新計數器）
 				const defaultFloorId = ctx.building.defaultFloorId;
 				for (const [id, agent] of agents) {
 					if (agent.floorId === msg.floorId) {
+						ctx.decrementFloorCount(msg.floorId);
 						agent.floorId = defaultFloorId;
+						ctx.incrementFloorCount(defaultFloorId);
 						ctx.floorSender(defaultFloorId).postMessage({
 							type: 'agentCreated', id,
 							projectName: extractProjectName(agent.projectDir),
@@ -871,8 +883,10 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			const oldFloorId = agent.floorId;
 			// 通知舊樓層角色將離開
 			ctx.floorSender(oldFloorId).postMessage({ type: 'agentFloorTransfer', id: msg.agentId, targetFloorId: msg.targetFloorId });
-			// 更新代理樓層
+			// 更新代理樓層與計數器
+			ctx.decrementFloorCount(oldFloorId);
 			agent.floorId = msg.targetFloorId;
+			ctx.incrementFloorCount(msg.targetFloorId);
 			persistAgents();
 			// 通知新樓層角色到達（帶 fromElevator 標記）
 			ctx.floorSender(msg.targetFloorId).postMessage({
