@@ -13,7 +13,7 @@ export function atomicWriteJson(filePath: string, data: unknown): void {
 		fs.writeFileSync(tmpPath, json, 'utf-8');
 		fs.renameSync(tmpPath, filePath);
 	} catch (err) {
-		try { fs.unlinkSync(tmpPath); } catch {}
+		try { fs.unlinkSync(tmpPath); } catch { /* ignore cleanup failure */ }
 		throw err;
 	}
 }

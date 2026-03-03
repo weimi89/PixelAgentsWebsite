@@ -19,6 +19,7 @@ function getHexColor(toolName: string): string {
 }
 
 export const AgentTimeline = memo(function AgentTimeline({ tools }: AgentTimelineProps) {
+  // eslint-disable-next-line react-hooks/purity -- intentional: real-time elapsed display
   const now = Date.now()
   const windowStart = now - TIMELINE_WINDOW_MS
   const recentTools = tools

@@ -5,6 +5,8 @@
  * JSONL 掃描邏輯、二進位偵測等 CLI 特定行為。
  */
 
+import * as fs from 'fs';
+
 /** 支援的 CLI 類型 */
 export const CLI_TYPES = ['claude', 'codex', 'gemini'] as const;
 export type CliType = (typeof CLI_TYPES)[number];
@@ -55,7 +57,6 @@ export function getAllAdapters(): CLIAdapter[] {
 export function getAvailableAdapters(): CLIAdapter[] {
 	return getAllAdapters().filter(a => {
 		try {
-			const fs = require('fs');
 			return a.isAvailable() || fs.existsSync(a.getProjectsRoot());
 		} catch {
 			return false;

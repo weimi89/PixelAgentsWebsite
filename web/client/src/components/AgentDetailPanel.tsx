@@ -459,6 +459,7 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
               const color = getToolColor(tool.status)
               const elapsed = tool.done
                 ? (tool.endTime != null ? Math.floor((tool.endTime - tool.startTime) / 1000) : 0)
+                // eslint-disable-next-line react-hooks/purity -- intentional: real-time elapsed display
                 : Math.floor((Date.now() - tool.startTime) / 1000)
 
               return (

@@ -112,6 +112,16 @@ function createAgent(overrides: Partial<AgentState> = {}): AgentState {
 		model: null,
 		tmuxSessionName: null,
 		isDetached: false,
+		transcriptLog: [],
+		floorId: '1F',
+		isRemote: false,
+		owner: null,
+		remoteSessionId: null,
+		gitBranch: null,
+		statusHistory: [],
+		teamName: null,
+		cliType: 'claude',
+		growth: { xp: 0, toolCallCount: 0, sessionCount: 0, bashCallCount: 0, achievements: [] },
 		...overrides,
 	};
 }
@@ -147,6 +157,8 @@ describe('processTranscriptLine', () => {
 			permissionTimers,
 			jsonlPollTimers: new Map(),
 			sender,
+			floorSender: () => sender,
+			progressExtensions: new Map(),
 			persistAgents: () => {},
 		} as AgentContext;
 		vi.useFakeTimers();
