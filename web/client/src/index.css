@@ -163,14 +163,9 @@ button {
     pointer-events: none;
   }
 
-  /* 縮放控制項：增大觸控區域 + safe area */
+  /* 縮放控制項：手機隱藏（已有雙指縮放+雙擊縮放手勢） */
   .pixel-zoom-controls {
-    top: calc(var(--safe-top) + 8px) !important;
-    left: calc(var(--safe-left) + 8px) !important;
-  }
-  .pixel-zoom-controls button {
-    width: 48px !important;
-    height: 48px !important;
+    display: none !important;
   }
 
   /* 代理詳情面板：全寬抽屜 */
