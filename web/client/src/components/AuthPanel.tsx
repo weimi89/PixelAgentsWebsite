@@ -478,17 +478,7 @@ export function AuthPanel() {
           </>
         )}
 
-        {/* 首次使用提示 */}
-        <div style={{
-          marginTop: 12,
-          padding: '8px',
-          background: 'var(--pixel-btn-bg)',
-          border: '2px solid var(--pixel-border)',
-          fontSize: '14px',
-          color: 'var(--pixel-text-dim)',
-        }}>
-          {t.firstTimeHint}
-        </div>
+{/* 首次使用提示已移除 — 不應在 UI 中顯示預設密碼 */}
       </div>
     )
   }

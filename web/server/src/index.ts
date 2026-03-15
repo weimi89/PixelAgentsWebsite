@@ -1691,6 +1691,8 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			break;
 		}
 		case 'requestDashboardData': {
+			const socketRole = (socket?.data?.role as string) || 'anonymous';
+			const socketUserId = socket?.data?.userId as string | undefined;
 			const dashStats = getDashboardStats();
 			const floorCounts = new Map<string, { total: number; active: number }>();
 			for (const f of ctx.building.floors) {
@@ -1706,6 +1708,9 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 					fc.total++;
 					if (isActive) fc.active++;
 				}
+				// anonymous：不加入代理列表；member：只加自己的代理
+				if (socketRole === 'anonymous') continue;
+				if (socketRole === 'member' && agent.ownerId !== socketUserId) continue;
 				const floorCfg = ctx.building.floors.find((f) => f.id === agent.floorId);
 				const toolNames = Array.from(agent.activeToolNames.values());
 				agentList.push({
@@ -1725,17 +1730,18 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 				const c = floorCounts.get(f.id) || { total: 0, active: 0 };
 				return { id: f.id, name: f.name, order: f.order, agentCount: c.total, activeCount: c.active };
 			});
+			// anonymous：只給樓層概覽和總數，不給工具分布和代理列表
+			const filteredStats = socketRole === 'anonymous'
+				? { totalAgents: agents.size, activeAgents: activeCount, totalToolCalls: 0, toolDistribution: {} as Record<string, number> }
+				: socketRole === 'member'
+				? { totalAgents: agentList.length, activeAgents: agentList.filter(a => a.isActive).length, totalToolCalls: 0, toolDistribution: {} as Record<string, number> }
+				: { totalAgents: agents.size, activeAgents: activeCount, totalToolCalls: dashStats.totalToolCalls, toolDistribution: dashStats.toolDistribution };
 			sender.postMessage({
 				type: 'dashboardData',
 				data: {
 					floors,
 					agents: agentList,
-					stats: {
-						totalAgents: agents.size,
-						activeAgents: activeCount,
-						totalToolCalls: dashStats.totalToolCalls,
-						toolDistribution: dashStats.toolDistribution,
-					},
+					stats: filteredStats,
 				},
 			});
 			break;

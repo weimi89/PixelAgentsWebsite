@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { vscode, onServerMessage } from '../socketApi.js'
+import { useAuth } from '../hooks/useAuth.js'
 import { t } from '../i18n.js'
 import { DASHBOARD_REFRESH_MS, TOOL_TYPE_COLORS_HEX } from '../constants.js'
 import type { DashboardPayload } from '../types/messages.js'
@@ -13,6 +14,7 @@ function getToolColor(name: string): string {
 }
 
 export function Dashboard() {
+  const { role } = useAuth()
   const [data, setData] = useState<DashboardPayload | null>(null)
   const [clock, setClock] = useState(new Date())
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -65,7 +67,7 @@ export function Dashboard() {
       <div className="pixel-dashboard-stats" style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', flex: 'none' }}>
         <StatCard label={t.totalAgents} value={stats.totalAgents} color="#5b8def" />
         <StatCard label={t.activeAgents} value={stats.activeAgents} color="#5bef7a" />
-        <StatCard label={t.totalToolCalls} value={stats.totalToolCalls} color="#efcf5b" />
+        {role === 'admin' && <StatCard label={t.totalToolCalls} value={stats.totalToolCalls} color="#efcf5b" />}
       </div>
 
       <div className="pixel-dashboard-body" style={{ display: 'flex', gap: 12, flex: 1, overflow: 'hidden' }}>
@@ -108,7 +110,8 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* 工具分布 */}
+          {/* 工具分布（僅 admin 可見） */}
+          {role === 'admin' && (
           <div style={{ ...sectionStyle, flex: 1, overflow: 'auto' }}>
             <h2 style={sectionTitleStyle}>{t.toolDistribution}</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -134,9 +137,11 @@ export function Dashboard() {
               )}
             </div>
           </div>
+          )}
         </div>
 
-        {/* 右側：代理列表 */}
+        {/* 右側：代理列表（anonymous 不可見） */}
+        {role !== 'anonymous' && (
         <div style={{ ...sectionStyle, flex: 1.5, overflow: 'auto', minWidth: 0 }}>
           <h2 style={sectionTitleStyle}>{t.agentList}</h2>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '18px' }}>
@@ -182,6 +187,7 @@ export function Dashboard() {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   )
