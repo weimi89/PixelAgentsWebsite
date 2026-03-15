@@ -7,6 +7,7 @@ interface UserInfo {
   role: 'admin' | 'member'
   createdAt: string
   mustChangePassword: boolean
+  apiKey: string
 }
 
 interface UserManagementPanelProps {
@@ -27,8 +28,8 @@ const panelStyle: React.CSSProperties = {
   borderRadius: 0,
   padding: '4px',
   boxShadow: 'var(--pixel-shadow)',
-  minWidth: 'min(360px, calc(100vw - 24px))',
-  maxWidth: 'min(500px, calc(100vw - 24px))',
+  minWidth: 'min(420px, calc(100vw - 24px))',
+  maxWidth: 'min(600px, calc(100vw - 24px))',
   maxHeight: '80vh',
   overflow: 'auto',
 }
@@ -43,10 +44,7 @@ const headerStyle: React.CSSProperties = {
 }
 
 const rowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: '5px 10px',
+  padding: '6px 10px',
   borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
 }
 
@@ -55,16 +53,24 @@ const btnStyle: React.CSSProperties = {
   border: '1px solid rgba(255, 255, 255, 0.3)',
   borderRadius: 0,
   color: 'rgba(255, 255, 255, 0.7)',
-  fontSize: '16px',
+  fontSize: '14px',
   cursor: 'pointer',
   padding: '2px 6px',
   marginLeft: 4,
+}
+
+/** 遮罩 API Key，僅顯示前 6 字元 */
+function maskApiKey(key: string): string {
+  if (key.length <= 6) return key
+  return key.slice(0, 6) + '*'.repeat(Math.min(key.length - 6, 20))
 }
 
 export function UserManagementPanel({ isOpen, onClose, token }: UserManagementPanelProps) {
   const [users, setUsers] = useState<UserInfo[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  /** 記錄哪些使用者的 API Key 已被展開 */
+  const [visibleApiKeys, setVisibleApiKeys] = useState<Set<string>>(new Set())
 
   const fetchUsers = useCallback(async () => {
     if (!token) return
@@ -91,6 +97,8 @@ export function UserManagementPanel({ isOpen, onClose, token }: UserManagementPa
   useEffect(() => {
     if (isOpen) {
       fetchUsers()
+      // 每次重新開啟時清除已展開的 API Key
+      setVisibleApiKeys(new Set())
     }
   }, [isOpen, fetchUsers])
 
@@ -144,6 +152,42 @@ export function UserManagementPanel({ isOpen, onClose, token }: UserManagementPa
     } catch {
       // 靜默失敗
     }
+  }
+
+  /** P4.1: 重設他人的 API Key */
+  const handleResetApiKey = async (userId: string, username: string) => {
+    if (!token) return
+    if (!window.confirm(t.resetApiKeyConfirm(username))) return
+    try {
+      const res = await fetch(`/api/auth/users/${userId}/reset-apikey`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const data = await res.json() as { apiKey: string }
+        // 更新本地使用者清單中的 API Key
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, apiKey: data.apiKey } : u)),
+        )
+        // 自動展開新的 API Key
+        setVisibleApiKeys((prev) => new Set(prev).add(userId))
+      }
+    } catch {
+      // 靜默失敗
+    }
+  }
+
+  /** 切換 API Key 的可見性 */
+  const toggleApiKeyVisibility = (userId: string) => {
+    setVisibleApiKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(userId)) {
+        next.delete(userId)
+      } else {
+        next.add(userId)
+      }
+      return next
+    })
   }
 
   return (
@@ -202,67 +246,91 @@ export function UserManagementPanel({ isOpen, onClose, token }: UserManagementPa
           </div>
         )}
 
-        {/* 表頭 */}
-        {users.length > 0 && (
-          <div
-            style={{
-              ...rowStyle,
-              fontWeight: 'bold',
-              color: 'rgba(255, 255, 255, 0.5)',
-              fontSize: '16px',
-              borderBottom: '1px solid var(--pixel-border)',
-            }}
-          >
-            <span style={{ flex: 2 }}>{t.userUsername}</span>
-            <span style={{ flex: 1, textAlign: 'center' }}>{t.userRole}</span>
-            <span style={{ flex: 1, textAlign: 'right' }}>{t.userActions}</span>
-          </div>
-        )}
-
         {users.map((user) => (
           <div key={user.id} style={rowStyle}>
-            <span
-              style={{
-                flex: 2,
-                fontSize: '20px',
-                color: 'rgba(255, 255, 255, 0.85)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {user.username}
-            </span>
-            <span style={{ flex: 1, textAlign: 'center' }}>
-              <select
-                value={user.role}
-                onChange={(e) => handleRoleChange(user.id, e.target.value as 'admin' | 'member')}
+            {/* 第一行：使用者名稱、角色、操作 */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span
                 style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  borderRadius: 0,
-                  color: 'rgba(255, 255, 255, 0.8)',
-                  fontSize: '16px',
-                  padding: '1px 4px',
-                  cursor: 'pointer',
+                  flex: 2,
+                  fontSize: '20px',
+                  color: 'rgba(255, 255, 255, 0.85)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <option value="admin">{t.roleAdmin}</option>
-                <option value="member">{t.roleMember}</option>
-              </select>
-            </span>
-            <span style={{ flex: 1, textAlign: 'right' }}>
+                {user.username}
+              </span>
+              <span style={{ flex: 1, textAlign: 'center' }}>
+                <select
+                  value={user.role}
+                  onChange={(e) => handleRoleChange(user.id, e.target.value as 'admin' | 'member')}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: 0,
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    fontSize: '16px',
+                    padding: '1px 4px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="admin">{t.roleAdmin}</option>
+                  <option value="member">{t.roleMember}</option>
+                </select>
+              </span>
+              <span style={{ flex: 1, textAlign: 'right' }}>
+                <button
+                  onClick={() => handleDelete(user.id, user.username)}
+                  style={{
+                    ...btnStyle,
+                    color: 'rgba(255, 100, 100, 0.8)',
+                    borderColor: 'rgba(255, 100, 100, 0.3)',
+                  }}
+                >
+                  {t.deleteUser}
+                </button>
+              </span>
+            </div>
+            {/* 第二行：API Key 顯示與操作 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+              <span style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.4)', minWidth: 52 }}>
+                {t.userApiKey}:
+              </span>
+              <code
+                style={{
+                  flex: 1,
+                  fontSize: '12px',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  padding: '1px 4px',
+                  fontFamily: 'monospace',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  cursor: 'pointer',
+                  userSelect: visibleApiKeys.has(user.id) ? 'all' : 'none',
+                }}
+                onClick={() => toggleApiKeyVisibility(user.id)}
+                title={visibleApiKeys.has(user.id) ? t.hideApiKey : t.showApiKey}
+              >
+                {visibleApiKeys.has(user.id) ? user.apiKey : maskApiKey(user.apiKey)}
+              </code>
               <button
-                onClick={() => handleDelete(user.id, user.username)}
+                onClick={() => handleResetApiKey(user.id, user.username)}
                 style={{
                   ...btnStyle,
-                  color: 'rgba(255, 100, 100, 0.8)',
-                  borderColor: 'rgba(255, 100, 100, 0.3)',
+                  fontSize: '12px',
+                  color: 'rgba(255, 180, 100, 0.8)',
+                  borderColor: 'rgba(255, 180, 100, 0.3)',
+                  marginLeft: 2,
                 }}
+                title={t.resetApiKey}
               >
-                {t.deleteUser}
+                {t.resetApiKey}
               </button>
-            </span>
+            </div>
           </div>
         ))}
       </div>

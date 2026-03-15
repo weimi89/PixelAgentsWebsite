@@ -113,11 +113,16 @@ export const STRESS_TEST_METRICS_INTERVAL_MS = 10_000;  // 指標記錄間隔
 export const RATE_LIMIT_API_WINDOW_MS = 60_000;       // API 路由速率限制視窗：1 分鐘
 export const RATE_LIMIT_API_MAX_REQUESTS = 100;        // API 路由：每分鐘最多 100 次
 export const RATE_LIMIT_LOGIN_WINDOW_MS = 60_000;      // 登入速率限制視窗：1 分鐘
-export const RATE_LIMIT_LOGIN_MAX_REQUESTS = 10;       // 登入：每分鐘最多 10 次
+export const RATE_LIMIT_LOGIN_MAX_REQUESTS = 5;        // 登入：每分鐘最多 5 次
 export const RATE_LIMIT_REGISTER_WINDOW_MS = 60_000;   // 註冊速率限制視窗：1 分鐘
 export const RATE_LIMIT_REGISTER_MAX_REQUESTS = 5;     // 註冊：每分鐘最多 5 次
 
 // ── 稽核日誌 ──────────────────────────────────────────────────
+export const INVITES_FILE_NAME = 'invites.json';
+export const INVITE_CODE_LENGTH = 16;
+export const INVITE_DEFAULT_EXPIRY_HOURS = 168; // 7 天
+export const REGISTRATION_POLICY_DEFAULT = 'open' as const;
+
 export const AUDIT_LOG_FILE_NAME = 'audit.jsonl';
 export const AUDIT_LOG_MAX_SIZE_BYTES = 1_048_576; // 1MB — 超過此大小自動輪替
 

@@ -8,6 +8,7 @@ import * as os from 'os';
 import {
 	DEFAULT_PORT,
 	LAYOUT_FILE_DIR,
+	REGISTRATION_POLICY_DEFAULT,
 } from './constants.js';
 
 function parseIntOrDefault(value: string | undefined, fallback: number): number {
@@ -47,4 +48,6 @@ export const config = {
 	serverId: process.env['SERVER_ID'] || crypto.randomUUID().slice(0, 8),
 	/** 是否啟用叢集模式（有 Redis 時自動啟用） */
 	clusterEnabled: !!process.env['REDIS_URL'],
+	/** 註冊策略：open（開放）、invite（邀請制）、closed（僅管理員可建立帳號） */
+	registrationPolicy: (process.env['REGISTRATION_POLICY'] || REGISTRATION_POLICY_DEFAULT) as 'open' | 'invite' | 'closed',
 } as const;

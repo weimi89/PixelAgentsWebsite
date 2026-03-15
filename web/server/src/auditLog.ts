@@ -25,7 +25,13 @@ export type AuditAction =
 	| 'layout_save'
 	| 'token_refresh'
 	| 'apikey_regenerate'
-	| 'assign_agent_owner';
+	| 'assign_agent_owner'
+	| 'invite_create'
+	| 'invite_use'
+	| 'invite_delete'
+	| 'registration_blocked'
+	| 'user_delete_cleanup'
+	| 'apikey_reset';
 
 interface AuditEntry {
 	timestamp: string;

@@ -18,8 +18,10 @@ import { signToken, signAccessToken, signRefreshToken, verifyToken, verifyRefres
 import type { TokenPayload } from './jwt.js';
 import { validatePassword } from 'pixel-agents-shared';
 import { logAudit } from '../auditLog.js';
-import { loadBuildingConfig, addFloor as addBuildingFloor } from '../buildingPersistence.js';
+import { loadBuildingConfig, writeBuildingConfig, addFloor as addBuildingFloor } from '../buildingPersistence.js';
 import type { BuildingConfig } from '../types.js';
+import { config } from '../config.js';
+import { createInvite, useInvite, listInvites, deleteInvite } from './inviteStore.js';
 
 const router = Router();
 
@@ -68,11 +70,45 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
 	next();
 }
 
+/** 嘗試從 Authorization header 解析 JWT（不強制要求，用於 closed 策略下的 admin 註冊） */
+function optionalAuth(req: Request, _res: Response, next: NextFunction): void {
+	const header = req.headers.authorization;
+	if (header?.startsWith('Bearer ')) {
+		try {
+			const token = header.slice(7);
+			req.auth = verifyToken(token);
+		} catch {
+			// token 無效時不阻擋，繼續走正常流程
+		}
+	}
+	next();
+}
+
 // ── 公開路由 ──────────────────────────────────────────────────
 
-router.post('/register', async (req, res) => {
+router.post('/register', optionalAuth, async (req, res) => {
 	try {
-		const { username, password } = req.body as { username?: string; password?: string };
+		const { username, password, inviteCode } = req.body as { username?: string; password?: string; inviteCode?: string };
+
+		// P4.2: 註冊策略檢查
+		const policy = config.registrationPolicy;
+		if (policy === 'closed') {
+			// 僅 admin 可建立帳號
+			if (req.auth?.role !== 'admin') {
+				logAudit('registration_blocked', undefined, `policy=closed username=${username ?? ''}`, req.ip);
+				res.status(403).json({ error: 'Registration is closed. Only administrators can create accounts.' });
+				return;
+			}
+		} else if (policy === 'invite') {
+			// 需要邀請碼
+			if (!inviteCode) {
+				logAudit('registration_blocked', undefined, `policy=invite username=${username ?? ''} reason=no_code`, req.ip);
+				res.status(400).json({ error: 'Invite code is required for registration' });
+				return;
+			}
+		}
+		// policy === 'open' → 不限制
+
 		if (!username || !password) {
 			res.status(400).json({ error: 'Username and password are required' });
 			return;
@@ -86,6 +122,18 @@ router.post('/register', async (req, res) => {
 			res.status(400).json({ error: validation.error });
 			return;
 		}
+
+		// P4.2: 邀請碼驗證（在建立使用者之前）
+		if (policy === 'invite' && inviteCode) {
+			const used = useInvite(inviteCode, username);
+			if (!used) {
+				logAudit('registration_blocked', undefined, `policy=invite username=${username} reason=invalid_code`, req.ip);
+				res.status(400).json({ error: 'Invalid or expired invite code' });
+				return;
+			}
+			logAudit('invite_use', undefined, `code=${inviteCode} username=${username}`, req.ip);
+		}
+
 		const user = await createUser(username, password);
 		const token = signToken(user.id, user.username, user.mustChangePassword, user.role);
 		const accessToken = signAccessToken(user.id, user.username, user.mustChangePassword, user.role);
@@ -215,6 +263,12 @@ router.post('/login-key', (req, res) => {
 	}
 });
 
+// ── 註冊策略查詢端點（公開） ─────────────────────────────────────
+
+router.get('/registration-policy', (_req, res) => {
+	res.json({ policy: config.registrationPolicy });
+});
+
 // ── 需要認證的路由 ────────────────────────────────────────────
 
 router.post('/change-password', requireAuth, async (req, res) => {
@@ -310,6 +364,25 @@ router.put('/users/:id/role', requireAuth, requireAdmin, (req, res) => {
 	}
 });
 
+// P4.1: 重設他人的 API Key（admin only）
+router.post('/users/:id/reset-apikey', requireAuth, requireAdmin, (req, res) => {
+	try {
+		const id = req.params.id as string;
+		const target = getUserById(id);
+		if (!target) {
+			res.status(404).json({ error: 'User not found' });
+			return;
+		}
+		const newKey = regenerateApiKey(id);
+		logAudit('apikey_reset', req.auth!.userId, `targetUserId=${id} targetUsername=${target.username}`, req.ip);
+		res.json({ apiKey: newKey, message: 'API key reset successfully' });
+	} catch (err) {
+		const message = err instanceof Error ? err.message : 'Failed to reset API key';
+		res.status(500).json({ error: message });
+	}
+});
+
+// P4.1: 刪除使用者時清理其專屬樓層的 ownerId
 router.delete('/users/:id', requireAuth, requireAdmin, (req, res) => {
 	try {
 		const id = req.params.id as string;
@@ -323,11 +396,73 @@ router.delete('/users/:id', requireAuth, requireAdmin, (req, res) => {
 			res.status(404).json({ error: 'User not found' });
 			return;
 		}
+
+		// P4.1: 將該使用者的專屬樓層 ownerId 設為 null（轉為公共樓層）
+		try {
+			const building = loadBuildingConfig();
+			let changed = false;
+			for (const floor of building.floors) {
+				if (floor.ownerId === id) {
+					floor.ownerId = null;
+					changed = true;
+				}
+			}
+			if (changed) {
+				writeBuildingConfig(building);
+				logAudit('user_delete_cleanup', req.auth!.userId, `userId=${id} action=floors_released`, req.ip);
+				onBuildingChanged?.(building);
+			}
+		} catch (cleanupErr) {
+			console.error('[Pixel Agents] Failed to cleanup floors for deleted user:', cleanupErr);
+		}
+
 		deleteUser(id);
-		logAudit('user_delete', req.auth!.userId, `deletedUserId=${id}`, req.ip);
+		logAudit('user_delete', req.auth!.userId, `deletedUserId=${id} username=${target.username}`, req.ip);
 		res.json({ message: 'User deleted', userId: id });
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Failed to delete user';
+		res.status(500).json({ error: message });
+	}
+});
+
+// ── 邀請碼管理路由（admin only） ─────────────────────────────────
+
+/** 建立邀請碼 */
+router.post('/invites', requireAuth, requireAdmin, (req, res) => {
+	try {
+		const { expiresInHours } = req.body as { expiresInHours?: number };
+		const invite = createInvite(req.auth!.userId, expiresInHours);
+		logAudit('invite_create', req.auth!.userId, `code=${invite.code}`, req.ip);
+		res.json({ invite });
+	} catch (err) {
+		const message = err instanceof Error ? err.message : 'Failed to create invite';
+		res.status(500).json({ error: message });
+	}
+});
+
+/** 列出所有邀請碼 */
+router.get('/invites', requireAuth, requireAdmin, (_req, res) => {
+	try {
+		const invites = listInvites();
+		res.json({ invites });
+	} catch {
+		res.status(500).json({ error: 'Failed to list invites' });
+	}
+});
+
+/** 刪除（撤銷）邀請碼 */
+router.delete('/invites/:code', requireAuth, requireAdmin, (req, res) => {
+	try {
+		const code = req.params.code as string;
+		const deleted = deleteInvite(code);
+		if (!deleted) {
+			res.status(404).json({ error: 'Invite code not found' });
+			return;
+		}
+		logAudit('invite_delete', req.auth!.userId, `code=${code}`, req.ip);
+		res.json({ message: 'Invite code deleted' });
+	} catch (err) {
+		const message = err instanceof Error ? err.message : 'Failed to delete invite';
 		res.status(500).json({ error: message });
 	}
 });

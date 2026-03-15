@@ -396,6 +396,7 @@ async function main(): Promise<void> {
 	// 認證路由（套用速率限制）
 	const authRouter = await initAuthRoutes();
 	app.use('/api/auth/login', loginRateLimit);
+	app.use('/api/auth/login-key', loginRateLimit);
 	app.use('/api/auth/register', registerRateLimit);
 	app.use('/api/auth', apiRateLimit, authRouter);
 
