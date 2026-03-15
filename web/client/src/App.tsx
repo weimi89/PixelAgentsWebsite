@@ -638,13 +638,15 @@ function App() {
         isAuthenticated={auth.isAuthenticated}
       />
 
-      {!panels.isDashboardView && interaction.contextMenu && (() => {
+      {!panels.isDashboardView && interaction.contextMenu && auth.isAuthenticated && (() => {
         const os = getOfficeState()
         const ch = os.characters.get(interaction.contextMenu.agentId)
         if (!ch) return null
         const isSubagent = ch.isSubagent
         const isRemote = !!remoteAgents[interaction.contextMenu.agentId]
         const meta = os.subagentMeta.get(interaction.contextMenu.agentId)
+        const agentOwnerId = remoteAgents[interaction.contextMenu.agentId]?.ownerId
+        const canOperate = auth.role === 'admin' || (auth.role === 'member' && (agentOwnerId == null || agentOwnerId === auth.userId))
         const actions: ContextMenuAction[] = []
         if (isSubagent && meta) {
           actions.push({ label: t.contextFocusParent, onClick: () => {
@@ -652,35 +654,39 @@ function App() {
             os.cameraFollowId = meta.parentAgentId
           }})
         } else {
-          actions.push({ label: t.contextGoToSeat, onClick: () => {
-            os.sendToSeat(interaction.contextMenu!.agentId)
-          }})
+          // 觀看類操作：所有登入用戶可用
           actions.push({ label: t.contextFollowCamera, onClick: () => {
             os.selectedAgentId = interaction.contextMenu!.agentId
             os.cameraFollowId = interaction.contextMenu!.agentId
           }})
-          if (building && building.floors.length > 1) {
-            for (const floor of building.floors) {
-              if (floor.id === currentFloorId) continue
-              actions.push({ label: `${t.contextMoveFloor} → ${floor.name || floor.id}`, onClick: () => {
-                vscode.postMessage({ type: 'moveAgentToFloor', agentId: interaction.contextMenu!.agentId, targetFloorId: floor.id })
+          // 以下操作需要擁有權限
+          if (canOperate) {
+            actions.push({ label: t.contextGoToSeat, onClick: () => {
+              os.sendToSeat(interaction.contextMenu!.agentId)
+            }})
+            if (building && building.floors.length > 1) {
+              for (const floor of building.floors) {
+                if (floor.id === currentFloorId) continue
+                actions.push({ label: `${t.contextMoveFloor} → ${floor.name || floor.id}`, onClick: () => {
+                  vscode.postMessage({ type: 'moveAgentToFloor', agentId: interaction.contextMenu!.agentId, targetFloorId: floor.id })
+                }})
+              }
+            }
+            actions.push({ label: t.setTeam, onClick: () => {
+              const current = agentTeams[interaction.contextMenu!.agentId] || ''
+              const name = prompt(t.teamName, current)
+              if (name !== null) {
+                vscode.postMessage({ type: 'setAgentTeam', agentId: interaction.contextMenu!.agentId, teamName: name || null })
+              }
+            }})
+            if (!isRemote) {
+              actions.push({ label: t.openTerminal, onClick: () => {
+                terminal.handleOpenTerminal(interaction.contextMenu!.agentId)
+              }})
+              actions.push({ label: t.closeAgent, onClick: () => {
+                interaction.handleCloseAgent(interaction.contextMenu!.agentId)
               }})
             }
-          }
-          actions.push({ label: t.setTeam, onClick: () => {
-            const current = agentTeams[interaction.contextMenu!.agentId] || ''
-            const name = prompt(t.teamName, current)
-            if (name !== null) {
-              vscode.postMessage({ type: 'setAgentTeam', agentId: interaction.contextMenu!.agentId, teamName: name || null })
-            }
-          }})
-          if (!isRemote) {
-            actions.push({ label: t.openTerminal, onClick: () => {
-              terminal.handleOpenTerminal(interaction.contextMenu!.agentId)
-            }})
-            actions.push({ label: t.closeAgent, onClick: () => {
-              interaction.handleCloseAgent(interaction.contextMenu!.agentId)
-            }})
           }
         }
         return (
