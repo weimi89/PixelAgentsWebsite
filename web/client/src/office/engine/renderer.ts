@@ -8,7 +8,6 @@ import { getColorizedFloorSprite, hasFloorSprites, WALL_COLOR } from '../floorTi
 import { hasWallSprites, getWallInstances, wallColorToHex } from '../wallTiles.js'
 import {
   MINIMAP_MARGIN,
-  MINIMAP_MARGIN_BOTTOM,
   MINIMAP_MIN_SIZE,
   MINIMAP_MAX_SIZE,
   MINIMAP_TILE_MIN_PX,
