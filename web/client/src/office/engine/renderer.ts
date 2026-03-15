@@ -963,10 +963,10 @@ export function renderMinimap(
   mmW = Math.round(mmW)
   mmH = Math.round(mmH)
 
-  const marginRight = MINIMAP_MARGIN * dpr
-  const marginBottom = (cssWidth < 768 ? 60 : MINIMAP_MARGIN_BOTTOM) * dpr
-  const mmX = canvasWidth - mmW - marginRight
-  const mmY = canvasHeight - mmH - marginBottom
+  const marginLeft = MINIMAP_MARGIN * dpr
+  const marginTop = MINIMAP_MARGIN * dpr
+  const mmX = marginLeft
+  const mmY = marginTop
 
   // 背景
   const border = Math.max(1, Math.round(dpr))
