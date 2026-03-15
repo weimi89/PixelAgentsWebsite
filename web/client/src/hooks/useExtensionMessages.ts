@@ -621,9 +621,17 @@ function handleNodeHealth(msg: ServerMessage & { type: 'nodeHealth' }, ctx: Hand
   ctx.setNodeHealthNodes(msg.nodes)
 }
 
+/** 自動觸發的請求 — 權限不足時靜默忽略，不顯示 toast */
+const SILENT_PERMISSION_ACTIONS = new Set([
+  'listSessions', 'listProjectDirs', 'requestDashboardData',
+  'requestBehaviorSettings', 'requestNodeHealth', 'requestStatusHistory',
+  'requestExportLayout', 'requestLayoutTemplates',
+])
+
 function handlePermissionDenied(msg: ServerMessage & { type: 'permissionDenied' }, ctx: HandlerContext): void {
+  // 自動請求的權限拒絕靜默忽略
+  if (SILENT_PERMISSION_ACTIONS.has(msg.action)) return
   console.warn(`[Webview] 權限被拒絕: action=${msg.action}, reason=${msg.reason}`)
-  // P5.4: 觸發友善提示 toast
   const message = t.permissionMessages[msg.action] || t.permissionMessages['default'] || msg.reason
   ctx.setPermissionToastMessage(message)
 }
