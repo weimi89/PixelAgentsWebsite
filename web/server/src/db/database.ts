@@ -36,6 +36,7 @@ export interface FloorRow {
 	name: string;
 	sort_order: number;
 	layout: string;
+	owner_id: string | null;
 	updated_at: string;
 }
 
@@ -233,15 +234,16 @@ export class Database {
 		).all() as FloorRow[];
 	}
 
-	saveFloor(id: string, name: string, order: number, layout: string): void {
+	saveFloor(id: string, name: string, order: number, layout: string, ownerId?: string | null): void {
 		this.db.prepare(
-			`INSERT INTO floors (id, name, sort_order, layout, updated_at)
-			 VALUES (?, ?, ?, ?, datetime('now'))
+			`INSERT INTO floors (id, name, sort_order, layout, owner_id, updated_at)
+			 VALUES (?, ?, ?, ?, ?, datetime('now'))
 			 ON CONFLICT(id) DO UPDATE SET name = excluded.name,
 			   sort_order = excluded.sort_order,
 			   layout = excluded.layout,
+			   owner_id = excluded.owner_id,
 			   updated_at = datetime('now')`,
-		).run(id, name, order, layout);
+		).run(id, name, order, layout, ownerId ?? null);
 	}
 
 	deleteFloor(id: string): void {

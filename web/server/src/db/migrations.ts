@@ -51,6 +51,14 @@ export const MIGRATIONS: Migration[] = [
 			}
 		},
 	},
+	{
+		version: 3,
+		up: [
+			// 新增 owner_id 欄位至 floors 表（樓層所有權模型）
+			`ALTER TABLE floors ADD COLUMN owner_id TEXT;`,
+		].join('\n'),
+		description: 'Add owner_id column to floors for per-user floor ownership',
+	},
 ];
 
 /**

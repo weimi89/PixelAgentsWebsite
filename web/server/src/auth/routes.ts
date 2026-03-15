@@ -18,8 +18,18 @@ import { signToken, signAccessToken, signRefreshToken, verifyToken, verifyRefres
 import type { TokenPayload } from './jwt.js';
 import { validatePassword } from 'pixel-agents-shared';
 import { logAudit } from '../auditLog.js';
+import { loadBuildingConfig, addFloor as addBuildingFloor } from '../buildingPersistence.js';
+import type { BuildingConfig } from '../types.js';
 
 const router = Router();
+
+/** 註冊時自動建立專屬樓層後的廣播回呼 */
+let onBuildingChanged: ((building: BuildingConfig) => void) | null = null;
+
+/** 設定建築物配置變更的廣播回呼（由 index.ts 在 io 就緒後呼叫） */
+export function setOnBuildingChanged(cb: (building: BuildingConfig) => void): void {
+	onBuildingChanged = cb;
+}
 
 // ── 擴展 Express Request 型別以包含認證資訊 ────────────────────
 declare global {
@@ -80,6 +90,28 @@ router.post('/register', async (req, res) => {
 		const token = signToken(user.id, user.username, user.mustChangePassword, user.role);
 		const accessToken = signAccessToken(user.id, user.username, user.mustChangePassword, user.role);
 		const refreshToken = signRefreshToken(user.id, user.username, user.role);
+
+		// P2.2: 為新使用者自動建立專屬樓層（member 角色）
+		if (user.role === 'member') {
+			try {
+				const building = loadBuildingConfig();
+				// 確保樓層名稱唯一（若重複則加數字後綴）
+				let floorName = username;
+				let suffix = 2;
+				while (building.floors.some(f => f.name === floorName)) {
+					floorName = `${username}-${suffix}`;
+					suffix++;
+				}
+				const newFloor = addBuildingFloor(building, floorName, user.id);
+				console.log(`[Pixel Agents] Auto-created floor "${newFloor.name}" (${newFloor.id}) for user ${username}`);
+				// 廣播更新的建築物配置至所有連線中的客戶端
+				onBuildingChanged?.(building);
+			} catch (floorErr) {
+				// 樓層建立失敗不影響註冊結果
+				console.error('[Pixel Agents] Failed to auto-create floor for new user:', floorErr);
+			}
+		}
+
 		logAudit('register', user.id, `username=${username}`, req.ip);
 		res.json({
 			token, accessToken, refreshToken,

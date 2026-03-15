@@ -10,6 +10,8 @@ export interface FloorConfig {
 	id: FloorId;
 	name: string;
 	order: number;
+	/** 樓層擁有者的使用者 ID（null 表示公共樓層） */
+	ownerId?: string | null;
 }
 
 export interface BuildingConfig {

@@ -609,6 +609,10 @@ function handleNodeHealth(msg: ServerMessage & { type: 'nodeHealth' }, ctx: Hand
   ctx.setNodeHealthNodes(msg.nodes)
 }
 
+function handlePermissionDenied(msg: ServerMessage & { type: 'permissionDenied' }): void {
+  console.warn(`[Webview] 權限被拒絕: action=${msg.action}, reason=${msg.reason}`)
+}
+
 function handleAgentGrowth(msg: ServerMessage & { type: 'agentGrowth' }, ctx: HandlerContext): void {
   // 更新 OfficeState 中角色的等級
   const ch = ctx.os.characters.get(msg.id)
@@ -695,6 +699,7 @@ const messageHandlers: Record<string, HandlerFn> = {
   behaviorSettingsLoaded: handleBehaviorSettingsLoaded as HandlerFn,
   agentGrowth: handleAgentGrowth as HandlerFn,
   nodeHealth: handleNodeHealth as HandlerFn,
+  permissionDenied: handlePermissionDenied as HandlerFn,
 }
 
 // ── Hook ────────────────────────────────────────────────────────

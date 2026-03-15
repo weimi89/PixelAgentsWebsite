@@ -45,7 +45,7 @@ import { isDemoEnabled, startDemoMode, stopDemoMode } from './demoMode.js';
 import { startAutoBackup, stopAutoBackup, runBackupNow } from './backup.js';
 import { sendTmuxKeys } from './tmuxManager.js';
 import { cancelPermissionTimer } from './timerManager.js';
-import { initAuthRoutes } from './auth/routes.js';
+import { initAuthRoutes, setOnBuildingChanged } from './auth/routes.js';
 import { socketAuthMiddleware, handleAuthUpgrade } from './auth/socketAuth.js';
 import { SENSITIVE_MESSAGE_TYPES, shouldSendMessage } from './auth/messageFilter.js';
 import { setupAgentNodeNamespace, getConnectedNodes, syncExcludedProjectsToNodes, startRemoteTerminalRelay, sendRemoteTerminalInput, sendRemoteTerminalResize, detachRemoteTerminal, forwardResumeSessionToNode } from './agentNodeHandler.js';
@@ -489,6 +489,15 @@ async function main(): Promise<void> {
 		},
 	};
 
+	// P2.2: 設定註冊時自動建立專屬樓層後的廣播回呼
+	setOnBuildingChanged((updatedBuilding) => {
+		// 更新 ctx.building 的樓層列表（保持引用同步）
+		ctx.building.floors = updatedBuilding.floors;
+		ctx.building.defaultFloorId = updatedBuilding.defaultFloorId;
+		ctx.sender?.postMessage({ type: 'buildingConfig', building: ctx.building });
+		ctx.broadcastFloorSummaries();
+	});
+
 	// 樓層 sender — 僅廣播至特定樓層的客戶端
 	// 敏感訊息會依角色過濾，僅發送給 admin/member
 	ctx.floorSender = (floorId: FloorId) => ({
@@ -910,6 +919,36 @@ function handleTerminalConnection(ws: WebSocket): void {
 	});
 }
 
+// ── P2.3: 樓層編輯權限檢查 ──────────────────────────────────────
+
+/** 檢查使用者是否有權限編輯指定樓層的佈局 */
+function checkFloorEditPermission(socket: import('socket.io').Socket | undefined, floorId: FloorId): boolean {
+	if (!socket) return false;
+	const role = socket.data.role as string;
+	if (role === 'admin') return true;
+	if (role === 'anonymous') return false;
+	// member 只能編輯自己的樓層
+	const floor = ctx.building.floors.find(f => f.id === floorId);
+	if (!floor) return false;
+	return floor.ownerId === socket.data.userId;
+}
+
+/** 檢查使用者是否為 admin 角色 */
+function isAdmin(socket: import('socket.io').Socket | undefined): boolean {
+	return socket?.data.role === 'admin';
+}
+
+/** 檢查使用者是否已登入（admin 或 member） */
+function isAuthenticated(socket: import('socket.io').Socket | undefined): boolean {
+	const role = socket?.data.role;
+	return role === 'admin' || role === 'member';
+}
+
+/** 發送權限被拒絕訊息至客戶端 */
+function sendPermissionDenied(sender: MessageSender, action: string, reason: string): void {
+	sender.postMessage({ type: 'permissionDenied', action, reason });
+}
+
 function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?: import('socket.io').Socket): void {
 	console.log(`[Pixel Agents] Received message: ${msg.type}`);
 	switch (msg.type) {
@@ -1005,13 +1044,18 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			break;
 		}
 		case 'closeAgent': {
+			// P2.3: 僅 admin 可關閉代理
+			if (!isAdmin(socket)) {
+				sendPermissionDenied(sender, 'closeAgent', 'insufficient_role');
+				break;
+			}
 			// 遠端代理不可被瀏覽器關閉
 			const targetAgent = agents.get(msg.id);
 			if (targetAgent?.isRemote) {
 				console.log(`[Pixel Agents] Ignoring closeAgent for remote agent ${msg.id}`);
 				break;
 			}
-			logAudit('agent_close', undefined, `agentId=${msg.id}`);
+			logAudit('agent_close', socket?.data.userId, `agentId=${msg.id}`);
 			closeAgent(msg.id, ctx);
 			break;
 		}
@@ -1024,9 +1068,14 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			break;
 		}
 		case 'saveLayout': {
+			// P2.3: admin 或 member（自己的樓層）才能儲存佈局
 			const floorId = (socket && socketFloors.get(socket.id)) || DEFAULT_FLOOR_ID;
+			if (!checkFloorEditPermission(socket, floorId)) {
+				sendPermissionDenied(sender, 'saveLayout', 'insufficient_role');
+				break;
+			}
 			writeFloorLayout(floorId, msg.layout);
-			logAudit('layout_save', undefined, `floorId=${floorId}`);
+			logAudit('layout_save', socket?.data.userId, `floorId=${floorId}`);
 			break;
 		}
 		case 'setSoundEnabled': {
@@ -1054,11 +1103,21 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			break;
 		}
 		case 'listSessions': {
+			// P2.3: 僅 admin 可瀏覽工作列表
+			if (!isAdmin(socket)) {
+				sendPermissionDenied(sender, 'listSessions', 'insufficient_role');
+				break;
+			}
 			const sessions = scanAllSessions(agents);
 			sender.postMessage({ type: 'sessionsList', sessions });
 			break;
 		}
 		case 'resumeSession': {
+			// P2.3: 僅 admin 可恢復工作
+			if (!isAdmin(socket)) {
+				sendPermissionDenied(sender, 'resumeSession', 'insufficient_role');
+				break;
+			}
 			// 路徑安全驗證
 			const sessionCheck = sanitizeSessionId(msg.sessionId);
 			if (!sessionCheck.valid) {
@@ -1092,7 +1151,21 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			break;
 		}
 		case 'requestExportLayout': {
+			// P2.5: 任何已登入用戶可匯出（member 可匯出自己的樓層，admin 可匯出任何樓層）
 			const exportFloor = (socket && socketFloors.get(socket.id)) || DEFAULT_FLOOR_ID;
+			if (!isAuthenticated(socket)) {
+				sendPermissionDenied(sender, 'requestExportLayout', 'insufficient_role');
+				break;
+			}
+			// member 只能匯出自己的樓層或公共樓層
+			if (!checkFloorEditPermission(socket, exportFloor) && !isAdmin(socket)) {
+				// member 仍可匯出公共樓層（ownerId 為 null），但不能匯出別人的私有樓層
+				const floorCfg = ctx.building.floors.find(f => f.id === exportFloor);
+				if (floorCfg?.ownerId && floorCfg.ownerId !== socket?.data.userId) {
+					sendPermissionDenied(sender, 'requestExportLayout', 'insufficient_role');
+					break;
+				}
+			}
 			const exportLayout = loadFloorLayout(exportFloor, defaultLayout);
 			sender.postMessage({ type: 'exportLayoutData', layout: exportLayout });
 			break;
@@ -1114,6 +1187,11 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			break;
 		}
 		case 'excludeProject': {
+			// P2.3: 僅 admin 可排除專案
+			if (!isAdmin(socket)) {
+				sendPermissionDenied(sender, 'excludeProject', 'insufficient_role');
+				break;
+			}
 			addExcludedProject(msg.projectDir);
 			// 以 basename 比對，收集該專案下所有自動收養的代理 ID（process=null 且非 tmux）
 			const excludeKey = path.basename(msg.projectDir);
@@ -1135,6 +1213,11 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			break;
 		}
 		case 'includeProject': {
+			// P2.3: 僅 admin 可取消排除專案
+			if (!isAdmin(socket)) {
+				sendPermissionDenied(sender, 'includeProject', 'insufficient_role');
+				break;
+			}
 			removeExcludedProject(msg.projectDir);
 			// 立即重新掃描一次
 			const projectDirs = getAllProjectDirs();
@@ -1179,6 +1262,11 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			break;
 		}
 		case 'saveFloorLayout': {
+			// P2.3: 檢查樓層編輯權限
+			if (!checkFloorEditPermission(socket, msg.floorId)) {
+				sendPermissionDenied(sender, 'saveFloorLayout', 'insufficient_role');
+				break;
+			}
 			writeFloorLayout(msg.floorId, msg.layout);
 			break;
 		}
@@ -1196,6 +1284,11 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			const tmpl = layoutTemplates.find((t: LayoutTemplate) => t.id === msg.templateId);
 			if (!tmpl) break;
 			const targetFloor = msg.floorId || (socket && socketFloors.get(socket.id)) || DEFAULT_FLOOR_ID;
+			// P2.3: 檢查樓層編輯權限
+			if (!checkFloorEditPermission(socket, targetFloor)) {
+				sendPermissionDenied(sender, 'loadLayoutTemplate', 'insufficient_role');
+				break;
+			}
 			writeFloorLayout(targetFloor, tmpl.layout);
 			// 廣播至同樓層的客戶端
 			ctx.floorSender(targetFloor).postMessage({ type: 'layoutLoaded', layout: tmpl.layout });
@@ -1203,6 +1296,11 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			break;
 		}
 		case 'addFloor': {
+			// P2.3: 僅 admin 可手動新增公共樓層
+			if (!isAdmin(socket)) {
+				sendPermissionDenied(sender, 'addFloor', 'insufficient_role');
+				break;
+			}
 			const newFloor = addBuildingFloor(ctx.building, msg.name);
 			console.log(`[Pixel Agents] Added floor: ${newFloor.id} "${newFloor.name}"`);
 			ctx.sender?.postMessage({ type: 'buildingConfig', building: ctx.building });
@@ -1210,6 +1308,11 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			break;
 		}
 		case 'removeFloor': {
+			// P2.3: 僅 admin 可移除樓層
+			if (!isAdmin(socket)) {
+				sendPermissionDenied(sender, 'removeFloor', 'insufficient_role');
+				break;
+			}
 			const removed = removeBuildingFloor(ctx.building, msg.floorId);
 			if (removed) {
 				// 清理該樓層的聊天歷史
@@ -1239,7 +1342,17 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			break;
 		}
 		case 'renameFloor': {
-			renameBuildingFloor(ctx.building, msg.floorId, msg.name);
+			// P2.4: 權限檢查（admin 可改任何樓層，member 只能改自己的樓層）
+			if (!checkFloorEditPermission(socket, msg.floorId)) {
+				sendPermissionDenied(sender, 'renameFloor', 'insufficient_role');
+				break;
+			}
+			// P2.4: 名稱唯一性驗證
+			const renameResult = renameBuildingFloor(ctx.building, msg.floorId, msg.name);
+			if (!renameResult.success) {
+				sendPermissionDenied(sender, 'renameFloor', renameResult.error || 'rename_failed');
+				break;
+			}
 			console.log(`[Pixel Agents] Renamed floor ${msg.floorId} to "${msg.name}"`);
 			ctx.sender?.postMessage({ type: 'buildingConfig', building: ctx.building });
 			break;
@@ -1383,6 +1496,11 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			break;
 		}
 		case 'approvePermission': {
+			// P2.3: 僅 admin 可核准權限請求
+			if (!isAdmin(socket)) {
+				sendPermissionDenied(sender, 'approvePermission', 'insufficient_role');
+				break;
+			}
 			const agent = agents.get(msg.agentId);
 			if (!agent || !agent.permissionSent) break;
 			if (agent.tmuxSessionName) {
@@ -1397,6 +1515,11 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			break;
 		}
 		case 'approveAllPermissions': {
+			// P2.3: 僅 admin 可批量核准權限請求
+			if (!isAdmin(socket)) {
+				sendPermissionDenied(sender, 'approveAllPermissions', 'insufficient_role');
+				break;
+			}
 			for (const [agentId, agent] of agents) {
 				if (!agent.permissionSent) continue;
 				if (agent.tmuxSessionName) {
@@ -1412,6 +1535,11 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			break;
 		}
 		case 'saveBehaviorSettings': {
+			// P2.3: 僅 admin 可修改行為設定
+			if (!isAdmin(socket)) {
+				sendPermissionDenied(sender, 'saveBehaviorSettings', 'insufficient_role');
+				break;
+			}
 			const merged = writeBehaviorSettings(msg.settings);
 			// 廣播給所有客戶端
 			ctx.sender?.postMessage({ type: 'behaviorSettingsLoaded', settings: merged });

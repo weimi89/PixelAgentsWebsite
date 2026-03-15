@@ -399,6 +399,13 @@ const zh_TW = {
 
   // Phase 6 新增 — 家具計數
   furnitureCount: (n: number) => `${n} 個素材`,
+
+  // Phase 2 — 樓層權限
+  permissionDenied: '權限不足',
+  cannotEditOthersFloor: '無法編輯他人的樓層',
+  floorNameAlreadyExists: '樓層名稱已被使用',
+  personalFloor: '個人樓層',
+  publicFloor: '公共樓層',
 }
 
 /** 語言字串型別（結構型別，非 literal） */
@@ -803,6 +810,13 @@ const en_US: LocaleStrings = {
 
   // Phase 6 — Furniture count
   furnitureCount: (n: number) => `${n} assets`,
+
+  // Phase 2 — Floor permissions
+  permissionDenied: 'Insufficient permissions',
+  cannotEditOthersFloor: "Cannot edit another user's floor",
+  floorNameAlreadyExists: 'Floor name already exists',
+  personalFloor: 'Personal Floor',
+  publicFloor: 'Public Floor',
 }
 
 // ── Locale 管理 ──────────────────────────────────────────────────

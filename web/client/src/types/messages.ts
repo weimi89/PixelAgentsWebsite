@@ -13,6 +13,8 @@ export interface FloorConfig {
   id: string
   name: string
   order: number
+  /** 樓層擁有者的使用者 ID（null 表示公共樓層） */
+  ownerId?: string | null
 }
 
 /** 建築物配置 */
@@ -103,6 +105,7 @@ export type ServerMessage =
   | { type: 'behaviorSettingsLoaded'; settings: Record<string, number> }
   | { type: 'agentGrowth'; id: number; xp: number; level: number; achievements: string[]; newAchievements: string[] }
   | { type: 'nodeHealth'; nodes: ConnectedNodeInfo[] }
+  | { type: 'permissionDenied'; action: string; reason: string }
 
 /** 已連線 Agent Node 的摘要資訊 */
 export interface ConnectedNodeInfo {

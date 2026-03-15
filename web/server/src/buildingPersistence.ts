@@ -57,7 +57,7 @@ export function loadBuildingConfig(): BuildingConfig {
 	const defaultConfig: BuildingConfig = {
 		version: 1,
 		defaultFloorId: DEFAULT_FLOOR_ID,
-		floors: [{ id: DEFAULT_FLOOR_ID, name: '1F 大廳', order: 1 }],
+		floors: [{ id: DEFAULT_FLOOR_ID, name: '1F 大廳', order: 1, ownerId: null }],
 	};
 
 	// 如果舊的 layout.json 存在，複製為 floors/1F.json
@@ -67,7 +67,7 @@ export function loadBuildingConfig(): BuildingConfig {
 			const layout = fs.readFileSync(oldLayoutPath, 'utf-8');
 			const parsed = JSON.parse(layout) as Record<string, unknown>;
 			if (db) {
-				db.saveFloor(DEFAULT_FLOOR_ID, '1F 大廳', 1, JSON.stringify(parsed));
+				db.saveFloor(DEFAULT_FLOOR_ID, '1F 大廳', 1, JSON.stringify(parsed), null);
 			} else {
 				const floorPath = getFloorLayoutPath(DEFAULT_FLOOR_ID);
 				if (!fs.existsSync(floorPath)) {
@@ -92,12 +92,12 @@ export function loadBuildingConfig(): BuildingConfig {
 export function writeBuildingConfig(config: BuildingConfig): void {
 	if (db) {
 		db.saveBuilding(JSON.stringify(config), config.defaultFloorId);
-		// 同步樓層到 DB
+		// 同步樓層到 DB（包含 ownerId）
 		for (const floor of config.floors) {
 			const existingFloor = db.getFloor(floor.id);
 			if (existingFloor) {
-				// 更新名稱和排序，保留佈局
-				db.saveFloor(floor.id, floor.name, floor.order, existingFloor.layout);
+				// 更新名稱、排序和擁有者，保留佈局
+				db.saveFloor(floor.id, floor.name, floor.order, existingFloor.layout, floor.ownerId ?? null);
 			}
 		}
 	}
@@ -164,16 +164,16 @@ export function loadFloorLayout(
 	return null;
 }
 
-/** 新增樓層 */
-export function addFloor(building: BuildingConfig, name: string): FloorConfig {
+/** 新增樓層（可指定擁有者，null 為公共樓層） */
+export function addFloor(building: BuildingConfig, name: string, ownerId?: string | null): FloorConfig {
 	const maxOrder = building.floors.reduce((max, f) => Math.max(max, f.order), 0);
 	const newOrder = maxOrder + 1;
 	const newId = `${newOrder}F`;
-	const floor: FloorConfig = { id: newId, name, order: newOrder };
+	const floor: FloorConfig = { id: newId, name, order: newOrder, ownerId: ownerId ?? null };
 	building.floors.push(floor);
-	// 在 DB 中建立空樓層記錄
+	// 在 DB 中建立空樓層記錄（包含擁有者）
 	if (db) {
-		db.saveFloor(newId, name, newOrder, '{}');
+		db.saveFloor(newId, name, newOrder, '{}', ownerId ?? null);
 	}
 	writeBuildingConfig(building);
 	return floor;
@@ -197,11 +197,14 @@ export function removeFloor(building: BuildingConfig, floorId: FloorId): boolean
 	return true;
 }
 
-/** 重新命名樓層 */
-export function renameFloor(building: BuildingConfig, floorId: FloorId, name: string): void {
+/** 重新命名樓層（回傳是否成功；名稱重複時回傳 false） */
+export function renameFloor(building: BuildingConfig, floorId: FloorId, name: string): { success: boolean; error?: string } {
 	const floor = building.floors.find(f => f.id === floorId);
-	if (floor) {
-		floor.name = name;
-		writeBuildingConfig(building);
-	}
+	if (!floor) return { success: false, error: 'floor_not_found' };
+	// 名稱唯一性檢查（排除自身）
+	const duplicate = building.floors.find(f => f.id !== floorId && f.name === name);
+	if (duplicate) return { success: false, error: 'name_already_exists' };
+	floor.name = name;
+	writeBuildingConfig(building);
+	return { success: true };
 }
