@@ -1138,7 +1138,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
 
     touchModeRef.current = 'none'
     touchStartPosRef.current = null
-  }, [isEditMode, officeState, editorState, zoom, onZoomChange, onClick, screenToWorld, screenToTile, cancelLongPress, onEditorTileAction, onEditorSelectionChange, onDragMove, onContextMenuProp])
+  }, [isEditMode, officeState, editorState, zoom, onZoomChange, onClick, screenToWorld, screenToTile, cancelLongPress, onEditorTileAction, onEditorSelectionChange, onDragMove])
 
   return (
     <div

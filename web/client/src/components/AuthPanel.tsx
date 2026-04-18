@@ -129,6 +129,19 @@ export function AuthPanel() {
 
   const popoverRef = useRef<HTMLDivElement>(null)
 
+  const resetForm = useCallback(() => {
+    setFormUsername('')
+    setFormPassword('')
+    setFormApiKey('')
+    setOldPassword('')
+    setNewPassword('')
+    setConfirmPwd('')
+    setError('')
+    setPwdSuccess(false)
+    setLoading(false)
+    setApiKeyCopied(false)
+  }, [])
+
   // ── Escape 鍵關閉 ─────────────────────────────────────────────
   useEffect(() => {
     if (view === 'closed') return
@@ -142,7 +155,7 @@ export function AuthPanel() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [view, mustChangePassword])
+  }, [view, mustChangePassword, resetForm])
 
   // ── 點擊外部關閉 ──────────────────────────────────────────────
   useEffect(() => {
@@ -162,20 +175,7 @@ export function AuthPanel() {
       clearTimeout(timer)
       window.removeEventListener('mousedown', handler)
     }
-  }, [view, mustChangePassword])
-
-  const resetForm = useCallback(() => {
-    setFormUsername('')
-    setFormPassword('')
-    setFormApiKey('')
-    setOldPassword('')
-    setNewPassword('')
-    setConfirmPwd('')
-    setError('')
-    setPwdSuccess(false)
-    setLoading(false)
-    setApiKeyCopied(false)
-  }, [])
+  }, [view, mustChangePassword, resetForm])
 
   // ── 帳號密碼登入 ──────────────────────────────────────────────
   const handleLogin = useCallback(async () => {
