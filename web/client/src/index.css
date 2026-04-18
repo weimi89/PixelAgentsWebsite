@@ -4,10 +4,11 @@
   font-weight: 400;
   font-display: swap;
   src: url('./fonts/FSPixelSansUnicode-Regular.ttf') format('truetype');
-  /* Restrict pixel font to Latin/symbols only — CJK falls through to system fonts */
+  /* 像素字型支援 Latin + 符號；CJK 自動 fallback 至下方 family stack 的高品質系統字型 */
   unicode-range: U+0000-024F, U+0300-036F, U+2000-206F, U+20A0-20CF, U+2100-214F, U+2190-21FF, U+2200-22FF, U+25A0-25FF, U+2600-26FF;
-  /* Scale up pixel font to visually match CJK system font height */
-  size-adjust: 140%;
+  /* 略微放大使像素字母視覺高度接近中日韓系統字體 x-height；
+     從 140% 降為 115% — 原本 140% 放大過度，導致中英混排時英文明顯高於中文 */
+  size-adjust: 115%;
 }
 
 :root,
@@ -131,11 +132,45 @@ html, body, #root {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  font-family: 'FS Pixel Sans', 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+  font-family:
+    'FS Pixel Sans',
+    /* macOS：依語系分別提供最佳 CJK 字型 */
+    'PingFang TC',            /* macOS 繁中 */
+    'PingFang SC',            /* macOS 簡中 */
+    'Hiragino Sans',          /* macOS 日文 */
+    'Apple SD Gothic Neo',    /* macOS 韓文 */
+    /* Windows：依語系分別 */
+    'Microsoft JhengHei',     /* Windows 繁中 */
+    'Microsoft YaHei',        /* Windows 簡中 */
+    'Yu Gothic',              /* Windows 日文 */
+    'Malgun Gothic',          /* Windows 韓文 */
+    /* 跨平台 Noto 全家族備援 */
+    'Noto Sans TC',
+    'Noto Sans SC',
+    'Noto Sans JP',
+    'Noto Sans KR',
+    sans-serif;
 }
 
 * {
-  font-family: 'FS Pixel Sans', 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+  font-family:
+    'FS Pixel Sans',
+    /* macOS：依語系分別提供最佳 CJK 字型 */
+    'PingFang TC',            /* macOS 繁中 */
+    'PingFang SC',            /* macOS 簡中 */
+    'Hiragino Sans',          /* macOS 日文 */
+    'Apple SD Gothic Neo',    /* macOS 韓文 */
+    /* Windows：依語系分別 */
+    'Microsoft JhengHei',     /* Windows 繁中 */
+    'Microsoft YaHei',        /* Windows 簡中 */
+    'Yu Gothic',              /* Windows 日文 */
+    'Malgun Gothic',          /* Windows 韓文 */
+    /* 跨平台 Noto 全家族備援 */
+    'Noto Sans TC',
+    'Noto Sans SC',
+    'Noto Sans JP',
+    'Noto Sans KR',
+    sans-serif;
 }
 
 @keyframes pixel-agents-pulse {
