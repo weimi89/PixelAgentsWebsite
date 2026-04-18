@@ -626,6 +626,8 @@ const SILENT_PERMISSION_ACTIONS = new Set([
   'listSessions', 'listProjectDirs', 'requestDashboardData',
   'requestBehaviorSettings', 'requestNodeHealth', 'requestStatusHistory',
   'requestExportLayout', 'requestLayoutTemplates',
+  // 由代理自動抵達事件觸發的座位同步 — 匿名訪客不應看到「權限不足」toast
+  'saveAgentSeats',
 ])
 
 function handlePermissionDenied(msg: ServerMessage & { type: 'permissionDenied' }, ctx: HandlerContext): void {

@@ -34,9 +34,12 @@ export function onServerMessage(handler: (data: unknown) => void): () => void {
 
 /**
  * 監聽 Socket.IO 連線狀態變更。
+ * 訂閱時會立即以目前狀態呼叫一次 handler，避免訂閱者晚於 connect/disconnect 事件而錯失初始狀態。
  * @returns 取消訂閱函式。
  */
 export function onConnectionChange(handler: (connected: boolean) => void): () => void {
+  // 訂閱當下先同步一次目前狀態（race-safe）
+  handler(socket.connected)
   const onConnect = () => handler(true)
   const onDisconnect = () => handler(false)
   socket.on('connect', onConnect)
