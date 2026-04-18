@@ -28,7 +28,8 @@
     "test": "cd server && npm test",
     "test:e2e": "npx tsx tests/e2e-smoke.ts",
     "format": "prettier --write 'client/src/**/*.{ts,tsx}' 'server/src/**/*.ts' 'shared/src/**/*.ts'",
-    "format:check": "prettier --check 'client/src/**/*.{ts,tsx}' 'server/src/**/*.ts' 'shared/src/**/*.ts'"
+    "format:check": "prettier --check 'client/src/**/*.{ts,tsx}' 'server/src/**/*.ts' 'shared/src/**/*.ts'",
+    "prepare": "cd .. && git config core.hooksPath .githooks 2>/dev/null || true"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# pre-commit：typecheck + test（僅針對 web/ 變動時執行）
+# 啟用方式：於 web/ 執行 `npm install` 會自動 `git config core.hooksPath .githooks`。
+# 手動啟用：`git config core.hooksPath .githooks`
+
+set -e
+
+# 若沒有任何 web/ 下的檔案變動，跳過檢查（加速非相關 commit）
+if ! git diff --cached --name-only | grep -qE '^web/'; then
+  exit 0
+fi
+
+ROOT_DIR=$(git rev-parse --show-toplevel)
+cd "$ROOT_DIR/web"
+
+echo "[pre-commit] typecheck..."
+npm run typecheck --silent
+
+echo "[pre-commit] test..."
+npm test --silent
+
+echo "[pre-commit] OK"
