@@ -19,6 +19,8 @@
     "build:client": "cd client && npm run build",
     "build:agent-node": "cd agent-node && npm run build",
     "start": "cd server && npm start",
+    "demo": "cd server && DEMO=1 DEMO_AGENTS=5 PORT=13001 node dist/index.js",
+    "demo:record": "echo '🎬 Starting recording-ready demo (5 agents, port 13001)...' && cd server && DEMO=1 DEMO_AGENTS=5 PORT=13001 node dist/index.js",
     "lint": "npm run lint:client && npm run lint:server",
     "lint:client": "cd client && npx eslint src/",
     "lint:server": "cd server && npx eslint src/",
