@@ -5,6 +5,13 @@
 ## [Unreleased]
 
 ### 新增
+- **UI 語系擴充：日文、簡體中文、韓文**
+  - `zh-CN` 简体中文（依 zh-TW 字形轉換 + 大陸用詞慣例）
+  - `ja-JP` 日本語（片假名外來語 + 漢字搭配，符合日本 UI 慣例）
+  - `ko-KR` 한국어（한자어 활용，GUI 標準簡潔形）
+  - 總計支援 5 個語系（原有 `zh-TW` / `en-US` + 新增 3 個）
+  - 因 `LocaleStrings` 型別 enforce，三套翻譯皆為完整覆蓋，typecheck 通過即保證無漏譯
+  - Bundle 影響：gzipped 僅 +0.5KB（文字壓縮率高）
 - **README 國際化**
   - `README.md` 改為英文主版（Operation Spotlight 前置：面向 GitHub 英文社群）
   - `README.zh-TW.md` 保留完整繁體中文版本（互相於檔頭交叉連結）
