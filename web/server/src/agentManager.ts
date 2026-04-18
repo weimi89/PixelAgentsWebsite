@@ -1,3 +1,23 @@
+/**
+ * agentManager — 本地代理（Agent）生命週期管理
+ *
+ * 職責：
+ *   - 代理的建立（resume/spawn）、關閉、移除
+ *   - 從 Claude 專案目錄結構解析專案名稱 / CLI 類型
+ *   - 掃描各 CLI 的專案目錄（配合 adapter）
+ *   - 將代理外觀與座位持久化至 `~/.pixel-agents/persisted-agents.json`
+ *   - 伺服器重啟時，從既有 tmux sessions 恢復失聯代理
+ *
+ * 不包含：
+ *   - 遠端代理（見 agentNodeHandler.ts）
+ *   - JSONL 檔案監聽與解析（見 fileWatcher.ts、transcriptParser.ts）
+ *
+ * 關鍵不變量：
+ *   - 一個 AgentState.id 與一個 JSONL 檔案 1:1 綁定（ctx.trackedJsonlFiles）
+ *   - 每個 agent 只有一個 tmuxSessionName 或一個 process（互斥）
+ *   - removeAgent 必須清理：fileWatchers、計時器、子進程 listeners、
+ *     trackedJsonlFiles 與 remoteAgentMap 的對應條目
+ */
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -374,7 +394,17 @@ function spawnCliAgent(
 	jsonlPollTimers.set(id, pollTimer);
 }
 
-/** 恢復既有的會話（自動判斷 CLI 類型） */
+/**
+ * 恢復既有的 Claude/Codex/Gemini 會話。
+ *
+ * - 依據 sessionProjectDir 偵測 CLI 類型
+ * - 透過對應 adapter 構造 `--resume <sessionId>` 參數（不同 CLI 格式不同）
+ * - spawn 新子進程並建立 AgentState；若 tmux 可用會包一層 tmux session
+ *
+ * @param sessionId     Claude 會話的 UUID（JSONL 檔名即 sessionId.jsonl）
+ * @param sessionProjectDir  該會話所在的專案目錄（`~/.claude/projects/<hash>/`）
+ * @param cwd           子進程工作目錄（= 原始專案實體路徑）
+ */
 export function resumeSession(
 	sessionId: string,
 	sessionProjectDir: string,
@@ -393,7 +423,22 @@ export function resumeSession(
 	);
 }
 
-/** 移除代理：清理所有計時器、監視器，並從狀態中刪除 */
+/**
+ * 移除代理：從系統中徹底清除單一代理的所有痕跡。
+ *
+ * 清理範圍（依序執行，任一步失敗不應阻塞後續）：
+ *   1. JSONL 輪詢計時器、fs.watch、2s 備援輪詢
+ *   2. 等待／權限氣泡計時器
+ *   3. 直接子進程的所有事件 listener（stdout/stderr/error/exit/close）
+ *      — 必要，否則快速 spawn/remove 會造成 MaxListeners 警告
+ *   4. trackedJsonlFiles 與 remoteAgentMap（若為遠端代理）
+ *   5. 樓層代理計數 - 1
+ *   6. DB 寫入 agent_history 的 offline 紀錄
+ *   7. agents Map 刪除 + 觸發持久化寫入
+ *
+ * 注意：本函式不會 kill 子進程或 tmux session；
+ *   若需終止「活」的代理，請使用 closeAgent() 包裝。
+ */
 export function removeAgent(
 	agentId: number,
 	ctx: AgentContext,
@@ -442,7 +487,22 @@ export function removeAgent(
 	persistAgents();
 }
 
-/** 關閉代理：終止 tmux 會話或直接進程，然後移除代理 */
+/**
+ * 使用者主動關閉代理（來自 UI 按下「關閉代理」按鈕）。
+ *
+ * 順序：
+ *   1. kill tmux session（若有）
+ *   2. process.kill('SIGTERM')（若為直接 spawn）
+ *   3. removeAgent() 清理狀態
+ *   4. 廣播 agentClosed 給同樓層客戶端
+ *
+ * 與 removeAgent 差異：removeAgent 只清理狀態、不 kill 進程；
+ * closeAgent = kill + removeAgent + 廣播。
+ *
+ * 遠端代理（isRemote=true）沒有本地 process / tmux，
+ * 實際 kill 由 Agent Node 執行（見 agentNodeHandler），
+ * 此函式在遠端代理上仍安全（跳過 kill、只做 remove + 廣播）。
+ */
 export function closeAgent(
 	agentId: number,
 	ctx: AgentContext,
@@ -470,7 +530,19 @@ export function closeAgent(
 
 // ── 伺服器重啟時的 tmux 恢復 ─────────────────────────
 
-/** 恢復上次伺服器執行中遺留的 tmux 代理會話 */
+/**
+ * 伺服器重啟後，收養仍活著的 pixel-agents-* tmux sessions，
+ * 讓之前正在工作的代理在重啟後「看起來」繼續工作。
+ *
+ * 流程：
+ *   1. 掃描系統中所有 `pixel-agents-*` 前綴的 tmux session
+ *   2. 從名稱反推 sessionId → JSONL 檔案路徑
+ *   3. 若 JSONL 已被其他自動偵測收養（trackedJsonlFiles），跳過
+ *   4. 其餘建立 process=null（已經由 tmux 接管）的 AgentState
+ *   5. 依 persisted-agents.json 還原外觀（palette/hue/seatId/floorId）
+ *
+ * @returns 本次恢復的代理數量
+ */
 export function recoverTmuxAgents(
 	ctx: AgentContext,
 ): number {
