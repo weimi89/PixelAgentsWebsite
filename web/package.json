@@ -25,6 +25,8 @@
     "demo": "cd server && DEMO=1 DEMO_AGENTS=5 PORT=13001 node dist/index.js",
     "demo:record": "echo '🎬 Starting recording-ready demo (5 agents, port 13001)...' && cd server && DEMO=1 DEMO_AGENTS=5 PORT=13001 node dist/index.js",
     "cli": "node bin/pixel-agents.mjs",
+    "check:desktop-sync": "node ../scripts/check-desktop-sync.mjs",
+    "sync:to-desktop": "node ../scripts/sync-to-desktop.mjs",
     "lint": "npm run lint:client && npm run lint:server",
     "lint:client": "cd client && npx eslint src/",
     "lint:server": "cd server && npx eslint src/",

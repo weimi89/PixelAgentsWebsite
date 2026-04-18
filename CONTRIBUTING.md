@@ -71,6 +71,35 @@ web/
 - **新增 bug 修復** → 請同時加測試防止未來回歸
 - **避免 mock 資料庫** — 用 `:memory:` SQLite 能抓到更多真問題
 
+## 🔗 與 PixelAgentsDesktop 的同步
+
+本 repo 是 **Agent ↔ Server 協議的權威來源**。[PixelAgentsDesktop](https://github.com/weimi89/PixelAgentsDesktop)（Tauri 桌面 app）
+的 `shared/` 目錄為本 repo `web/shared/src/` 的複製品。
+
+**改動協議時**：
+
+```bash
+# 1. 在本 repo 修改 web/shared/src/protocol.ts 或 formatToolStatus.ts
+# 2. 驗證 Desktop 是否 drift
+cd web && npm run check:desktop-sync
+
+# 3. 若 drift，將變更推送至 Desktop
+npm run sync:to-desktop
+
+# 4. 切換到 Desktop repo 檢視、commit、push
+cd ../../PixelAgentsDesktop
+git diff shared/
+git add shared/
+git commit -m "sync: pull latest shared/ from PixelAgentsWebsite"
+git push
+```
+
+CI 會在每個 PR 自動跑 `desktop-drift` job，若兩邊 drift 會警告（但不阻擋合併 — 只是提醒）。
+
+> **為什麼不用 npm 套件或 submodule？**
+> Desktop 是 Tauri + Node sidecar 的獨立產品，保持 repo 分離讓兩邊演進速度不互相牽制。
+> 協議層手動複製+CI drift check 是務實的平衡點。若兩邊 drift 頻繁，再考慮升級為 submodule / npm package。
+
 ## 🔒 安全貢獻
 
 請先讀 [`SECURITY.md`](SECURITY.md)。任何涉及認證/密碼/API Key 的改動都需要：

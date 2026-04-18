@@ -86,3 +86,42 @@ jobs:
       - name: Audit (moderate+)
         run: npm audit --audit-level=moderate
         continue-on-error: true
+
+  desktop-drift:
+    name: PixelAgentsDesktop shared/ drift
+    runs-on: ubuntu-latest
+    # 允許失敗不阻擋其他 job；drift 只是提醒信號
+    continue-on-error: true
+    steps:
+      - name: Checkout this repo (PixelAgentsWebsite)
+        uses: actions/checkout@v4
+        with:
+          path: web-repo
+
+      # 若 Desktop repo 未公開或尚未建立，clone 會失敗 — 用 continue-on-error 容忍
+      - name: Checkout PixelAgentsDesktop (sibling repo)
+        id: clone-desktop
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          repository: weimi89/PixelAgentsDesktop
+          path: PixelAgentsDesktop
+
+      - name: Setup Node
+        if: steps.clone-desktop.outcome == 'success'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run drift check
+        if: steps.clone-desktop.outcome == 'success'
+        working-directory: web-repo
+        env:
+          PIXEL_AGENTS_DESKTOP_PATH: ${{ github.workspace }}/PixelAgentsDesktop
+        run: node scripts/check-desktop-sync.mjs --required
+
+      - name: Report skipped check
+        if: steps.clone-desktop.outcome != 'success'
+        run: |
+          echo "⏭ Desktop repo not accessible — drift check skipped." >> $GITHUB_STEP_SUMMARY
+          echo "If Desktop is private, configure deploy keys or make drift check informational only." >> $GITHUB_STEP_SUMMARY

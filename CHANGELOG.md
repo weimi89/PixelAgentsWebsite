@@ -5,6 +5,12 @@
 ## [Unreleased]
 
 ### 新增
+- **與 PixelAgentsDesktop 的 shared/ 同步機制**
+  - `scripts/check-desktop-sync.mjs`：比對兩 repo 的 `shared/` 是否 drift
+  - `scripts/sync-to-desktop.mjs`：把本 repo 權威版本推送至 Desktop
+  - `npm run check:desktop-sync` / `npm run sync:to-desktop` 便捷腳本
+  - CI `desktop-drift` job：每個 PR 自動檢查（informational）
+  - `CONTRIBUTING.md` 新增「與 PixelAgentsDesktop 的同步」章節
 - **CLI：`pixel-agents` 可執行命令**
   - `web/bin/pixel-agents.mjs` 零依賴 Node CLI
   - 自動偵測 server 就緒後開瀏覽器
