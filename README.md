@@ -50,7 +50,7 @@ npm run build
 npm start
 ```
 
-瀏覽器開啟 `http://localhost:3000`。
+瀏覽器開啟 `http://localhost:13001`（預設）。可用 `PORT` 環境變數調整。
 
 ### 開發模式
 
@@ -96,10 +96,19 @@ web/
     src/
       index.ts                — 入口：Express 靜態檔案 + Socket.IO + auth 路由 + Agent Node namespace
       agentManager.ts         — 代理生命週期：自動偵測、會話恢復、清理
-      agentNodeHandler.ts     — Agent Node namespace（/agent-node）：JWT 認證、遠端代理管理
+      agentNodeHandler.ts     — Agent Node namespace：JWT 認證、遠端代理管理、30s 重連 grace
       fileWatcher.ts          — fs.watch + 輪詢、JSONL 增量讀取、自動收養
       transcriptParser.ts     — JSONL 解析 -> Socket.IO 訊息
-      auth/                   — JWT 認證 + 使用者管理（bcryptjs）
+      auth/                   — JWT 認證、使用者管理（bcrypt r=12）、Socket.IO auth 中間件、邀請碼
+      atomicWrite.ts          — JSON 原子寫入（.tmp + fsync + rename）
+      pathSecurity.ts         — 路徑遍歷與符號連結逃逸防護
+      rateLimit.ts            — API 速率限制（FIFO LRU 驅逐）
+      auditLog.ts             — 稽核日誌（SQLite + JSONL 備援，自動遮蔽敏感欄位）
+      backup.ts               — 自動備份（預設每 6h，保留 5 份）
+      cluster.ts              — 叢集心跳（Redis 啟用時）
+      db/                     — SQLite 資料庫、Redis 快取、JSON 遷移
+      config.ts               — 環境變數集中讀取
+      logger.ts               — 結構化 logger
       assetLoader.ts          — PNG 解析、精靈圖轉換、家具目錄載入
       buildingPersistence.ts  — 建築物配置 + 樓層佈局持久化
       floorAssignment.ts      — 專案 -> 樓層映射持久化
@@ -108,7 +117,10 @@ web/
       sessionScanner.ts       — 工作階段掃描（瀏覽過去會話）
       timerManager.ts         — 等待/權限計時器
       tmuxManager.ts          — tmux 會話管理與健康檢查
+      terminalManager.ts      — 本地 PTY 管理（node-pty）
+      lanDiscovery.ts         — UDP 區網自動發現
       demoMode.ts             — 演示模式：模擬代理行為序列
+      stressTest.ts           — 壓力測試代理生成器
       constants.ts            — 伺服器常數（計時、截斷、解析、端口）
       types.ts                — 共享介面（AgentState, ClientMessage, FloorConfig, BuildingConfig）
 
@@ -165,6 +177,41 @@ web/
 
 網格可擴展至 64x64 格。
 
+## 環境變數
+
+伺服器支援以下環境變數（全部選用）：
+
+### 基本
+
+| 變數 | 預設 | 說明 |
+|------|------|------|
+| `PORT` | `13001` | HTTP 伺服器監聽埠 |
+| `HTTPS` | — | 設為 `1` 啟用 HTTPS（自簽憑證） |
+| `DEMO` / `--demo` | — | 演示模式 |
+| `DEMO_AGENTS` | `3` | 演示模式代理數量 |
+| `DATA_DIR` | `~/.pixel-agents` | 使用者資料目錄 |
+| `NODE_ENV` | `development` | `production` 啟用嚴格 CSP |
+
+### 認證與安全
+
+| 變數 | 預設 | 說明 |
+|------|------|------|
+| `REGISTRATION_POLICY` | `open` | 註冊策略：`open`、`invite`、`closed` |
+| `REQUIRE_PASSWORD_SPECIAL_CHAR` | — | `1` 強制密碼含特殊字元 |
+| `API_KEY_ENCRYPTION_KEY` | — | API Key 加密金鑰（未設定時使用 JWT secret） |
+| `TRUST_PROXY` | — | 在反向代理後方部署時設為 `true`、`1` 或 CIDR，使 `req.ip` 正確反映原始客戶端 |
+| `ALLOWED_ORIGINS` | — | 逗號分隔，額外允許的 Socket.IO/CORS 來源 |
+
+### 叢集與擴展
+
+| 變數 | 預設 | 說明 |
+|------|------|------|
+| `REDIS_URL` | — | Redis 連線 URL，啟用後自動開啟叢集模式 |
+| `SERVER_ID` | 隨機 8 碼 | 叢集節點識別碼 |
+| `LOG_LEVEL` | `info` | `debug`、`info`、`warn`、`error` |
+
+> **生產部署提示**：若部署在 nginx/Cloudflare 等反向代理後，務必設 `TRUST_PROXY`，否則速率限制會將所有請求判為同一來源。
+
 ## 多機器連線
 
 透過 Agent Node CLI，遠端機器可將其 Claude Code 會話推送至中央伺服器：
@@ -191,9 +238,25 @@ npm run import-tileset
 
 ## 技術棧
 
-- **Web 伺服器**: Node.js, Express 5, Socket.IO 4, TypeScript, pngjs
-- **Web 客戶端**: React 19, TypeScript, Vite 7, Canvas 2D, Socket.IO Client
+- **Web 伺服器**: Node.js, Express 5, Socket.IO 4, TypeScript, pngjs, better-sqlite3, bcryptjs, ioredis（選用）
+- **Web 客戶端**: React 19, TypeScript, Vite 7, Canvas 2D, Socket.IO Client, xterm.js
 - **原始擴充**: TypeScript, VS Code Webview API, esbuild
+
+## 部署考量
+
+### 首載 bundle
+前端採 lazy loading 分離：
+- 主頁首載 ~569KB（gzip 154KB）— 含 React + Socket.IO + App
+- `TerminalPanel`（xterm.js）延後至實際開終端才載入 336KB
+- `Dashboard` 僅 hash `#/dashboard` 時執行
+
+### 資料目錄
+所有使用者資料儲存於 `~/.pixel-agents/`：
+- `pixel-agents.db` — 主要 SQLite 資料庫
+- `building.json` + `floors/*.json` — 樓層佈局
+- `users.json` / `jwt-secret.key` — 認證（有 SQLite 後優先存 DB）
+- `audit.jsonl` — 稽核日誌（備援）
+- `backups/` — 自動備份
 
 ## 致謝
 

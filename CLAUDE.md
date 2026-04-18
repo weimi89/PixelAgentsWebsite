@@ -17,25 +17,48 @@ web/
   server/                     — Express + Socket.IO 後端（Node.js）
     src/
       index.ts                — 入口：Express 靜態檔案 + Socket.IO 連線處理 + auth 路由 + Agent Node namespace
-      agentManager.ts         — 代理生命週期：自動偵測、會話恢復、清理
-      agentNodeHandler.ts     — Agent Node Socket.IO namespace（/agent-node）：JWT 認證、遠端代理管理
-      fileWatcher.ts          — fs.watch + 2s 輪詢、JSONL 增量讀取、自動收養
-      transcriptParser.ts     — JSONL 解析：tool_use/tool_result → Socket.IO 訊息（formatToolStatus 從 shared 匯入）
+      config.ts               — 所有環境變數集中讀取（PORT、TRUST_PROXY、REDIS_URL 等）
+      agentManager.ts         — 代理生命週期：自動偵測、會話恢復、清理（含子進程 listener cleanup）
+      agentNodeHandler.ts     — Agent Node namespace：JWT、遠端代理、30s 斷線 grace 無縫重連
+      fileWatcher.ts          — fs.watch + 2s 輪詢、JSONL 增量讀取、自動收養；Gemini 尾部讀取
+      transcriptParser.ts     — JSONL 解析：tool_use/tool_result → Socket.IO 訊息
       auth/
-        userStore.ts          — 使用者帳號持久化（~/.pixel-agents/users.json, bcryptjs）
-        jwt.ts                — JWT 簽發與驗證（~/.pixel-agents/jwt-secret.key）
-        routes.ts             — POST /api/auth/register、POST /api/auth/login
+        userStore.ts          — 使用者帳號（SQLite 優先，JSON 備援）；bcrypt r=12；API Key AES-256-GCM 加密 + timing-safe 比對
+        jwt.ts                — JWT 簽發與驗證（access + refresh token）
+        routes.ts             — /api/auth/ register、login、login-key、refresh、change-password、invites、users
+        socketAuth.ts         — Socket.IO 認證中介（匿名連線每 IP 限制 + TRUST_PROXY 控制的 x-forwarded-for 解析）
+        inviteStore.ts        — 邀請碼管理（invite 註冊策略用）
+        messageFilter.ts      — 敏感訊息類型過濾（非 admin 看不到）
+      atomicWrite.ts          — JSON 原子寫入（.tmp + fsync + rename）
+      pathSecurity.ts         — 路徑遍歷與符號連結逃逸防護（realpath 檢查）
+      rateLimit.ts            — API 速率限制（FIFO LRU 上限防偽造 IP 填爆）
+      auditLog.ts             — 稽核日誌（SQLite + JSONL 備援，自動遮蔽 password/token/key）
+      backup.ts               — 自動備份（預設 6h 一次，保留 5 份）
+      cluster.ts              — 叢集心跳（有 REDIS_URL 時啟用）
+      db/
+        database.ts           — better-sqlite3 封裝 + schema migration（users、audit_log、floors 等）
+        redis.ts              — ioredis 封裝（Socket.IO adapter + JWT/agent 快取）
+        jsonMigration.ts      — JSON → SQLite 首次遷移
+      logger.ts               — 結構化日誌（LOG_LEVEL 控制）
       assetLoader.ts          — PNG 解析、精靈圖轉換、家具目錄建構、預設佈局載入
       layoutPersistence.ts    — ~/.pixel-agents/layout.json 讀寫（舊版單層佈局，保留供備用）
       buildingPersistence.ts  — 建築物配置 + 樓層佈局持久化（~/.pixel-agents/building.json + floors/*.json）
       floorAssignment.ts      — 專案→樓層映射持久化（~/.pixel-agents/project-floor-map.json）
       projectNameStore.ts     — 自訂專案名稱映射 + 專案排除清單持久化
+      teamNameStore.ts        — 代理團隊名稱映射
+      behaviorSettingsStore.ts — 行為參數持久化（閒置節奏、漫遊機率等）
       sessionScanner.ts       — 工作階段掃描（瀏覽過去會話）
       timerManager.ts         — 等待/權限計時器邏輯
       tmuxManager.ts          — tmux 會話管理（spawnSync 安全呼叫）與健康檢查
+      terminalManager.ts      — 本地 PTY（node-pty）管理與追蹤
+      lanDiscovery.ts         — UDP 區網自動發現（多伺服器實例互見）
+      dashboardStats.ts       — 儀表板統計聚合
+      growthSystem.ts         — 代理成長（XP / 等級 / 成就）
+      stressTest.ts           — 壓力測試代理生成器（--stress N）
       demoMode.ts             — 演示模式：模擬代理行為序列（--demo 旗標）
+      cliAdapters/            — 多 CLI 支援（claudeAdapter、codexAdapter、geminiAdapter）
       colorUtils.ts           — 伺服器端色彩工具
-      constants.ts            — 伺服器常數（計時、截斷、解析、端口 3000）
+      constants.ts            — 伺服器常數（計時、端口 13001、bcrypt rounds、grace 時間等）
       types.ts                — 共享介面（AgentState, MessageSender, ClientMessage, AgentContext, FloorConfig, BuildingConfig）
 
   client/                     — React + TypeScript（Vite）
@@ -272,6 +295,7 @@ npm install && cd webview-ui && npm install && cd .. && npm run build
 
 | 檔案 | 用途 |
 |------|------|
+| `pixel-agents.db` | **主要 SQLite 資料庫**（users、audit_log、tool_stats、agent_history 等，優先於 JSON） |
 | `layout.json` | 舊版辦公室佈局（保留供備用，已遷移至 floors/） |
 | `building.json` | 建築物配置（樓層清單、預設樓層） |
 | `floors/*.json` | 各樓層佈局（地板、牆壁、家具） |
@@ -280,9 +304,56 @@ npm install && cd webview-ui && npm install && cd .. && npm run build
 | `project-names.json` | 自訂專案顯示名稱映射 |
 | `excluded-projects.json` | 排除的專案資料夾清單 |
 | `settings.json` | 音效通知等使用者設定 |
-| `users.json` | 使用者帳號（username + bcrypt 雜湊密碼） |
-| `jwt-secret.key` | JWT 簽名密鑰（首次啟動自動生成 256-bit） |
+| `users.json` | 使用者帳號 JSON 備援（SQLite 啟用後不寫入此檔） |
+| `jwt-secret.key` | JWT 簽名密鑰 + API Key 加密金鑰（首次啟動自動生成 256-bit） |
+| `invites.json` | 邀請碼（invite 策略用） |
+| `audit.jsonl` | 稽核日誌 JSONL 備援（SQLite 寫入失敗時回退） |
+| `backups/` | 自動備份（預設 6h 一次、保留 5 份） |
 | `node-config.json` | Agent Node CLI 配置（server URL + JWT token） |
+
+## 環境變數
+
+### 基本
+
+| 變數 | 預設 | 說明 |
+|------|------|------|
+| `PORT` | `13001` | HTTP 伺服器監聽埠 |
+| `HTTPS` / `--https` | — | 啟用 HTTPS（自簽憑證自動產生） |
+| `DEMO` / `--demo` | — | 演示模式 |
+| `DEMO_AGENTS` | `3` | 演示代理數量 |
+| `STRESS_TEST` / `--stress N` | `0` | 壓力測試代理數 |
+| `DATA_DIR` | `~/.pixel-agents` | 使用者資料目錄 |
+| `NODE_ENV` | `development` | `production` 啟用嚴格 CSP |
+| `LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` |
+
+### 認證與安全
+
+| 變數 | 預設 | 說明 |
+|------|------|------|
+| `REGISTRATION_POLICY` | `open` | `open`、`invite`、`closed` |
+| `REQUIRE_PASSWORD_SPECIAL_CHAR` | — | `1` 強制密碼含特殊字元 |
+| `API_KEY_ENCRYPTION_KEY` | — | 自訂 API Key 加密金鑰；未設時退回 JWT secret（若也缺則拋錯） |
+| `TRUST_PROXY` | — | 反向代理部署時必設（`true`、`1`、CIDR），否則 `x-forwarded-for` 不被信任 |
+| `ALLOWED_ORIGINS` | — | 逗號分隔額外 CORS/Socket.IO 來源 |
+
+### 叢集
+
+| 變數 | 預設 | 說明 |
+|------|------|------|
+| `REDIS_URL` | — | Redis URL；設定即自動啟用叢集模式（Socket.IO Redis adapter + 心跳） |
+| `SERVER_ID` | 隨機 8 碼 | 叢集節點識別碼 |
+
+## 安全設計
+
+- **路徑遍歷**：`pathSecurity.validatePathWithinRoot()` 逐層檢查 `..`、null byte、符號連結實際解析（`fs.realpathSync` 比對 root）
+- **API Key 比對**：`crypto.timingSafeEqual` 防 timing attack；快取命中 O(1)，未命中以常數時間遍歷解密
+- **密碼雜湊**：bcrypt rounds = 12（`BCRYPT_SALT_ROUNDS` 常數）
+- **API Key 加密**：AES-256-GCM；金鑰缺失時拒啟動而非 fallback 預設值
+- **原子寫入**：`atomicWriteJson` 使用 `.tmp` + `fsync` + `rename` 三段式確保斷電一致性
+- **速率限制**：`rateLimit.ts` 使用 FIFO LRU 上限（預設 10000 鍵）防止偽造 IP 填爆 store
+- **稽核日誌**：`auditLog.redactSensitive()` 自動遮蔽 `password`/`token`/`apikey`/`secret` 等關鍵字（正則匹配 `key=value` 與 JSON 格式）
+- **CSP**：production 模式嚴格 `default-src 'self'`，dev 放寬 `unsafe-eval` 給 Vite HMR
+- **Agent Node 斷線 grace**：預設 30s 寬限期，短暫抖動重連可恢復代理狀態（`AGENT_NODE_RECONNECT_GRACE_MS`）
 
 ## 關鍵決策
 
@@ -296,6 +367,9 @@ npm install && cd webview-ui && npm install && cd .. && npm run build
 - Monorepo workspaces：`web/shared` + `web/server` + `web/client` + `web/agent-node`
 - tmux 作為進程管理備選（支援 detach/reattach）
 - `ClientMessage` discriminated union 型別確保客戶端訊息安全
+- **Bundle 分割**：`main.tsx` 以 React.lazy 切 `App` 與 `Dashboard`；`App.tsx` 內 `TerminalPanel`（xterm.js 336KB）也 lazy；Vite manualChunks 分離 react-vendor / socket-vendor 以利長期快取
+- **SQLite 優先，JSON 備援**：`db/database.ts` 啟動後所有持久化優先走 SQLite；`db/jsonMigration.ts` 在首次啟動自動從舊 JSON 遷移
+- **走動自然化**：`advanceWalk()` helper 以像素距離（非時間）推進動畫幀；抬腳幀身體上抬 1px 實現 bob；方向改變時 `turnPauseTimer` 短暫停頓模擬轉身
 
 ### VS Code 擴充（原始版本）
 - `WebviewViewProvider`（非 `WebviewPanel`）— 位於面板區域，與終端並列

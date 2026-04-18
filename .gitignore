@@ -24,7 +24,7 @@ dist
 backups/
 
 # Dev notes
-doc/dev-notes/
+docs/dev-notes/
 
 # Tools
 .claude/
