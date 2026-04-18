@@ -1,3 +1,24 @@
+/**
+ * index.ts — Express + Socket.IO 伺服器入口
+ *
+ * 職責（按啟動順序）：
+ *   1. 註冊 CLI 適配器（Claude / Codex / Gemini）
+ *   2. 初始化 SQLite 資料庫與選用的 Redis
+ *   3. 載入資源（家具/地板/牆壁/角色精靈圖 + 預設佈局）
+ *   4. 建立 Express app + HTTP 伺服器 + Socket.IO（主 namespace + /agent-node）
+ *   5. 掛載 auth routes、監控 routes、rate limiter
+ *   6. 設定 WebSocket 終端中繼（/terminal）
+ *   7. 啟動自動偵測掃描、tmux 健康檢查、LAN discovery、儀表板 flush、自動備份
+ *   8. Socket.IO 連線處理：代理建立、訊息分派、樓層切換、編輯器操作等
+ *
+ * 關鍵設計：
+ *   - agents/fileWatchers/pollingTimers 等 Map 為全域單例，透過 AgentContext 傳給其他模組
+ *   - 所有代理狀態以 JSON 檔案持久化（~/.pixel-agents/*.json）
+ *   - /agent-node namespace 專給遠端 Node 使用，主 namespace 給瀏覽器
+ *   - 樓層使用 Socket.IO Room 隔離廣播（代理相關訊息只送同樓層）
+ *   - 全域廣播走 ctx.sender；樓層廣播走 ctx.floorSender(floorId)
+ *   - Graceful shutdown：SIGTERM/SIGINT 觸發，flush stats、儲存、斷開連線、關閉伺服器
+ */
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -132,43 +153,54 @@ let layoutTemplates: import('./assetLoader.js').LayoutTemplate[] = [];
 
 const userDir = path.join(os.homedir(), LAYOUT_FILE_DIR);
 
+/** settings.json 路徑（使用者設定：音效、除錯模式等） */
 function getSettingsPath(): string {
 	return path.join(userDir, SETTINGS_FILE_NAME);
 }
 
+/** agent-seats.json 路徑（代理 ID → 座位 ID 的對應） */
 function getAgentSeatsPath(): string {
 	return path.join(userDir, AGENT_SEATS_FILE_NAME);
 }
 
+/** 通用 JSON 讀取：檔案不存在或解析失敗時回傳 fallback */
 function readJsonFile<T>(filePath: string, fallback: T): T {
 	try {
+		// 檔案不存在是正常情境（首次啟動）
 		if (!fs.existsSync(filePath)) return fallback;
 		return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T;
 	} catch {
+		// JSON 損毀時保底回 fallback，避免整個伺服器啟動失敗
 		return fallback;
 	}
 }
 
+/** 通用 JSON 寫入：透過 atomicWriteJson 確保原子性（tmp + rename） */
 function writeJsonFile(filePath: string, data: unknown): void {
 	try {
 		atomicWriteJson(filePath, data);
 	} catch (err) {
+		// 寫入失敗只記 log 不中斷（下次會重試）
 		console.error(`[Pixel Agents] Failed to write ${filePath}:`, err);
 	}
 }
 
+/** persistAgents 包裝 — 交給 agentManager 執行（透過 DI 避免循環依賴） */
 function persistAgents(): void {
 	savePersistedAgents(agents);
 }
 
 // ── 決定工作目錄 ──────────────────────────────────────────
 
+/** 由當前目錄向上搜尋 `.git` 作為 git 根目錄；深度超過 MAX 回傳 null */
 function findGitRoot(startDir: string): string | null {
 	let dir = startDir;
 	let depth = 0;
 	while (depth < GIT_ROOT_MAX_DEPTH) {
+		// 找到 .git 就回傳此層
 		if (fs.existsSync(path.join(dir, '.git'))) return dir;
 		const parent = path.dirname(dir);
+		// 已到檔案系統根（parent === dir）→ 終止
 		if (parent === dir) return null;
 		dir = parent;
 		depth++;
@@ -199,7 +231,13 @@ const building = loadBuildingConfig();
 const floorAgentCounts = new Map<string, number>();
 logger.info('Building loaded', { floors: building.floors.length, defaultFloor: building.defaultFloorId });
 
-/** 暫時的 sender 佔位 — 在 socket 連線時更新 */
+/**
+ * 共享的代理執行環境（集中傳遞狀態的 DI 容器）。
+ * 其他模組（agentManager / fileWatcher / transcriptParser 等）接收此 ctx 避免循環依賴。
+ *
+ * sender / floorSender / broadcastFloorSummaries 先用 no-op 佔位；
+ * 在 main() 中 io 建立後才替換為真正會廣播到 Socket.IO 的實作。
+ */
 const ctx: AgentContext = {
 	agents,
 	nextAgentIdRef,
@@ -209,20 +247,22 @@ const ctx: AgentContext = {
 	waitingTimers,
 	permissionTimers,
 	jsonlPollTimers,
-	sender: undefined,
+	sender: undefined, // 全域廣播器（給所有 socket）— main() 中指定
 	persistAgents,
 	trackedJsonlFiles: new Map(),
 	ownProjectDir,
-	socketFloors,
-	building,
-	floorSender: () => ({ postMessage() {} }), // 佔位，main() 中替換
-	broadcastFloorSummaries: () => {}, // 佔位，main() 中替換
-	remoteAgentMap: new Map(),
-	progressExtensions: new Map(),
+	socketFloors, // socket → floorId 映射，用於決定推播目標
+	building, // 建築物配置（樓層清單）
+	floorSender: () => ({ postMessage() {} }), // 佔位；樓層廣播（只送同樓層 socket）
+	broadcastFloorSummaries: () => {}, // 佔位；樓層代理數摘要廣播
+	remoteAgentMap: new Map(), // sessionId → agentId，用於遠端代理反查
+	progressExtensions: new Map(), // 紀錄每代理 permission timer 延長次數
 	incrementFloorCount: (floorId: FloorId) => {
+		// 增加樓層代理計數（樓層選擇器顯示用）
 		floorAgentCounts.set(floorId, (floorAgentCounts.get(floorId) || 0) + 1);
 	},
 	decrementFloorCount: (floorId: FloorId) => {
+		// 減少樓層代理計數；歸零就從 Map 清除避免累積
 		const count = (floorAgentCounts.get(floorId) || 0) - 1;
 		if (count <= 0) floorAgentCounts.delete(floorId);
 		else floorAgentCounts.set(floorId, count);
@@ -242,23 +282,27 @@ function startTmuxHealthCheck(): void {
 
 // ── 解析素材根目錄 ──────────────────────────────────────
 
+/**
+ * 解析素材根目錄。依序檢查多個可能路徑，回傳第一個存在 `assets/` 子目錄的位置。
+ * 這樣可以同時支援開發模式（public）、正式建置（dist）、npx 部署（env override）。
+ */
 function findAssetsRoot(): string {
-	// 檢查 0：環境變數覆寫（npx / Docker / 自訂部署優先）
+	// 檢查 0：環境變數覆寫 — npx 全域安裝或自訂部署路徑
 	const envRoot = process.env['PIXEL_AGENTS_ASSETS_ROOT'];
 	if (envRoot && fs.existsSync(path.join(envRoot, 'assets'))) {
 		return envRoot;
 	}
-	// 檢查 1：web/client/public/（開發模式）
+	// 檢查 1：web/client/public/ — Vite 開發模式（未建置）
 	const clientPublic = path.join(__dirname, '..', '..', 'client', 'public');
 	if (fs.existsSync(path.join(clientPublic, 'assets'))) {
 		return clientPublic;
 	}
-	// 檢查 2：web/client/dist/（正式建置）
+	// 檢查 2：web/client/dist/ — Vite build 產出（正式部署）
 	const clientDist = path.join(__dirname, '..', '..', 'client', 'dist');
 	if (fs.existsSync(path.join(clientDist, 'assets'))) {
 		return clientDist;
 	}
-	// 檢查 3：專案根目錄的 webview-ui/public/
+	// 檢查 3：webview-ui/public/ — 原始 VS Code 擴充的素材位置（共用備選）
 	const webviewPublic = path.join(__dirname, '..', '..', '..', 'webview-ui', 'public');
 	if (fs.existsSync(path.join(webviewPublic, 'assets'))) {
 		return webviewPublic;
@@ -737,22 +781,32 @@ function stopLanPeerBroadcast(): void {
 	lastLanPeersJson = '';
 }
 
+/**
+ * Graceful shutdown — SIGTERM/SIGINT 觸發，分階段釋放資源。
+ *
+ * 設計重點：
+ *   - 階段化進行，確保不丟資料（先停新連線，後 flush DB/stats，最後退出）
+ *   - 使用 shuttingDown 旗標防止重入（第二次 SIGINT 不會重跑流程）
+ *   - tmux 會話刻意不終止：使用者重啟伺服器後可透過 recoverTmuxAgents 恢復
+ *   - 設定硬超時保護（GRACEFUL_SHUTDOWN_TIMEOUT_MS）避免永遠卡住
+ */
 function setupGracefulShutdown(
 	httpServer: ReturnType<typeof createServer>,
 	io: Server,
 ): void {
 	let shuttingDown = false;
 	function shutdown(signal: string): void {
+		// 重入防護：已在關機流程中就忽略
 		if (shuttingDown) return;
 		shuttingDown = true;
 		logger.info(`${signal} received, shutting down...`);
 
-		// Phase 1: 停止接受新連線
+		// Phase 1：停止接受新 HTTP 連線（既有連線繼續處理至排空）
 		httpServer.close(() => {
 			logger.debug('HTTP server closed, no longer accepting connections');
 		});
 
-		// Phase 2: 清除全域計時器
+		// Phase 2：清除所有全域計時器，避免關機後仍觸發
 		if (projectScanTimerRef.current) {
 			clearTimeout(projectScanTimerRef.current);
 			projectScanTimerRef.current = null;
@@ -761,6 +815,7 @@ function setupGracefulShutdown(
 			clearInterval(tmuxHealthTimer);
 			tmuxHealthTimer = null;
 		}
+		// 演示模式與壓力測試需個別終止（避免背景循環續跑）
 		if (isDemoEnabled()) stopDemoMode();
 		stopStressTest();
 		stopAutoBackup();
@@ -771,14 +826,16 @@ function setupGracefulShutdown(
 			clearInterval(nodeHealthBroadcastTimer);
 			nodeHealthBroadcastTimer = null;
 		}
+		// 終端 pty 需主動 kill（子進程不會跟著主進程走）
 		cleanupAllTerminals();
 
-		// Phase 2.5: 停止叢集管理器
+		// Phase 2.5：停止叢集管理器（非同步，失敗只記 log）
 		cluster.stop().catch((err) => {
 			logger.error('Failed to stop cluster manager', { error: err });
 		});
 
-		// Phase 3: 清除代理資源（不終止 tmux — 保留供下次恢復）
+		// Phase 3：清除每代理的資源
+		// 特別注意：tmux 會話不終止（保留供下次 recoverTmuxAgents 恢復）
 		for (const [agentId, agent] of agents) {
 			const jp = jsonlPollTimers.get(agentId);
 			if (jp) clearInterval(jp);
@@ -789,6 +846,7 @@ function setupGracefulShutdown(
 			if (wt) clearTimeout(wt);
 			const pm = permissionTimers.get(agentId);
 			if (pm) clearTimeout(pm);
+			// 只有本服務 spawn 的進程才 kill（tmux 代理 process=null 跳過）
 			if (agent.process && !agent.process.killed) {
 				agent.process.kill('SIGTERM');
 			}
@@ -799,12 +857,12 @@ function setupGracefulShutdown(
 		waitingTimers.clear();
 		permissionTimers.clear();
 
-		// Phase 4: 刷新所有待寫入資料
+		// Phase 4：刷新所有待寫入資料到磁碟
 		persistAgents();
 		flushDashboardStats();
 		logger.info('Pending data flushed');
 
-		// Phase 4.5: 關閉資料庫連線
+		// Phase 4.5：關閉 SQLite 連線（WAL checkpoint + 釋放 file lock）
 		try {
 			database.close();
 			logger.info('Database closed');
@@ -812,25 +870,27 @@ function setupGracefulShutdown(
 			logger.error('Failed to close database', { error: err });
 		}
 
-		// Phase 4.6: 斷開 Redis 連線
+		// Phase 4.6：非同步斷開 Redis（如有連線）
 		if (redis.isConnected()) {
 			redis.disconnect().catch((err) => {
 				logger.error('Failed to disconnect Redis', { error: err });
 			});
 		}
 
-		// Phase 5: 等待 Socket.IO 連線排空後退出
+		// Phase 5：關閉 Socket.IO — 會等所有客戶端斷開後呼叫 callback
 		io.close(() => {
 			logger.info('Shutdown complete');
 			process.exit(0);
 		});
 
-		// 強制退出保護
+		// 硬超時保護：超過預定時間仍未結束就強制退出（避免殘留進程）
+		// .unref() 讓此 timer 不阻擋 event loop 退出
 		setTimeout(() => {
 			logger.warn('Forced shutdown after timeout');
 			process.exit(1);
 		}, GRACEFUL_SHUTDOWN_TIMEOUT_MS).unref();
 	}
+	// Ctrl+C 與 kill 指令都走同一流程
 	process.on('SIGINT', () => shutdown('SIGINT'));
 	process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
@@ -979,15 +1039,20 @@ function handleTerminalConnection(ws: WebSocket): void {
 	});
 }
 
-// ── P2.3: 樓層編輯權限檢查 ──────────────────────────────────────
+// ── 權限檢查 — 以 socket.data.role 判定 ──────────────────────
 
-/** 檢查使用者是否有權限編輯指定樓層的佈局 */
+/**
+ * 檢查使用者是否可編輯指定樓層佈局。
+ * 規則：admin 全通過；anonymous 拒絕；member 只能編輯自己擁有的樓層。
+ */
 function checkFloorEditPermission(socket: import('socket.io').Socket | undefined, floorId: FloorId): boolean {
 	if (!socket) return false;
 	const role = socket.data.role as string;
+	// admin 擁有全權（包含他人樓層）
 	if (role === 'admin') return true;
+	// 未登入 → 拒絕（訪客僅可瀏覽）
 	if (role === 'anonymous') return false;
-	// member 只能編輯自己的樓層
+	// member 僅可編輯自己 ownerId 所擁有的樓層
 	const floor = ctx.building.floors.find(f => f.id === floorId);
 	if (!floor) return false;
 	return floor.ownerId === socket.data.userId;
@@ -998,26 +1063,31 @@ function isAdmin(socket: import('socket.io').Socket | undefined): boolean {
 	return socket?.data.role === 'admin';
 }
 
-/** 檢查使用者是否已登入（admin 或 member） */
+/** 檢查使用者是否已登入（admin 或 member）— 排除 anonymous */
 function isAuthenticated(socket: import('socket.io').Socket | undefined): boolean {
 	const role = socket?.data.role;
 	return role === 'admin' || role === 'member';
 }
 
-/** 發送權限被拒絕訊息至客戶端 */
+/** 發送 permissionDenied 訊息 — 客戶端會顯示錯誤提示 */
 function sendPermissionDenied(sender: MessageSender, action: string, reason: string): void {
 	sender.postMessage({ type: 'permissionDenied', action, reason });
 }
 
-/** P3.2: 檢查使用者是否有權限操作指定代理（admin 可操作所有，member 只能操作自己的） */
+/**
+ * 檢查使用者是否可操作指定代理。
+ * 規則：admin 全通過；anonymous 拒絕；member 只能操作自己擁有的代理。
+ * 特別注意：ownerId 為 null 的自動偵測代理對所有 member 都禁止（只有 admin 可管）。
+ */
 function checkAgentPermission(socket: import('socket.io').Socket | undefined, agentId: number): boolean {
 	if (!socket) return false;
 	const role = socket.data.role as string;
 	if (role === 'admin') return true;
 	if (role === 'anonymous') return false;
-	// member 只能操作自己的代理（ownerId 為 null 的代理，任何 member 都不可操作）
+	// member 只能操作自己建立的代理
 	const agent = ctx.agents.get(agentId);
 	if (!agent) return false;
+	// 無主代理（自動偵測）僅 admin 可管，member 無權干預
 	if (agent.ownerId == null) return false;
 	return agent.ownerId === socket.data.userId;
 }
