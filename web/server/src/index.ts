@@ -470,7 +470,7 @@ async function main(): Promise<void> {
 		}
 	});
 
-	// 指標端點（壓力測試與監控用）
+	// 指標端點（JSON 格式，壓力測試與監控用；保留向下相容）
 	app.get('/api/metrics', (_req, res) => {
 		const mem = process.memoryUsage();
 		res.json({
@@ -481,6 +481,41 @@ async function main(): Promise<void> {
 			rssMB: Math.round(mem.rss / 1024 / 1024),
 			uptimeSeconds: Math.round(process.uptime()),
 		});
+	});
+
+	// Prometheus 指標端點（OpenMetrics text format）
+	// 使用 `scrape_configs` 設定為 `metrics_path: /metrics` 即可直接接 Prometheus
+	app.get('/metrics', (_req, res) => {
+		const mem = process.memoryUsage();
+		const uptime = process.uptime();
+		const lines: string[] = [
+			'# HELP pixel_agents_active_total Currently active agents (local + remote)',
+			'# TYPE pixel_agents_active_total gauge',
+			`pixel_agents_active_total ${ctx.agents.size}`,
+			'# HELP pixel_agents_remote_total Currently active remote agents (via Agent Node)',
+			'# TYPE pixel_agents_remote_total gauge',
+			`pixel_agents_remote_total ${ctx.remoteAgentMap.size}`,
+			'# HELP pixel_agents_tracked_files_total JSONL files currently being watched',
+			'# TYPE pixel_agents_tracked_files_total gauge',
+			`pixel_agents_tracked_files_total ${ctx.trackedJsonlFiles.size}`,
+			'# HELP pixel_agents_floors_total Configured building floors',
+			'# TYPE pixel_agents_floors_total gauge',
+			`pixel_agents_floors_total ${ctx.building.floors.length}`,
+			'# HELP process_resident_memory_bytes Resident set size in bytes',
+			'# TYPE process_resident_memory_bytes gauge',
+			`process_resident_memory_bytes ${mem.rss}`,
+			'# HELP process_heap_used_bytes Heap memory used in bytes',
+			'# TYPE process_heap_used_bytes gauge',
+			`process_heap_used_bytes ${mem.heapUsed}`,
+			'# HELP process_heap_total_bytes Heap memory allocated in bytes',
+			'# TYPE process_heap_total_bytes gauge',
+			`process_heap_total_bytes ${mem.heapTotal}`,
+			'# HELP process_uptime_seconds Process uptime in seconds',
+			'# TYPE process_uptime_seconds gauge',
+			`process_uptime_seconds ${uptime.toFixed(3)}`,
+		];
+		res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+		res.send(lines.join('\n') + '\n');
 	});
 
 	// 詳細狀態端點（含版本、樓層、記憶體等）
