@@ -451,14 +451,23 @@ async function main(): Promise<void> {
 	app.use('/api/auth/register', registerRateLimit);
 	app.use('/api/auth', apiRateLimit, authRouter);
 
-	// 健康檢查端點
+	// ── 健康檢查端點（Docker HEALTHCHECK / 負載均衡器）────────
+	// /health：liveness — 進程存活即回 200
 	app.get('/health', (_req, res) => {
 		res.json({ status: 'ok', uptime: Math.round(process.uptime()) });
 	});
-
-	// ── 健康檢查端點（Docker HEALTHCHECK / 負載均衡器）────────
-	app.get('/health', (_req, res) => {
-		res.json({ status: 'ok', uptime: Math.round(process.uptime()) });
+	// /ready：readiness — 檢查資料庫/關鍵資源可用，否則回 503
+	app.get('/ready', (_req, res) => {
+		try {
+			// 若設定了 Redis，也要求其可連線
+			if (config.redisUrl && !redis.isConnected()) {
+				res.status(503).json({ ready: false, reason: 'redis_disconnected' });
+				return;
+			}
+			res.json({ ready: true, uptime: Math.round(process.uptime()) });
+		} catch (err) {
+			res.status(503).json({ ready: false, reason: err instanceof Error ? err.message : 'unknown' });
+		}
 	});
 
 	// 指標端點（壓力測試與監控用）

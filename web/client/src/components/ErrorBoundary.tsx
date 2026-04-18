@@ -4,6 +4,10 @@ import { t } from '../i18n.js'
 
 interface Props {
   children: ReactNode
+  /** 子元件級降級 UI：若有則顯示此節點取代整頁錯誤畫面 */
+  fallback?: ReactNode | ((error: Error, retry: () => void) => ReactNode)
+  /** 顯示名稱，錯誤時可讓使用者辨認哪個區塊失敗（例：辦公室畫面） */
+  name?: string
 }
 
 interface State {
@@ -22,7 +26,8 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('[Pixel Agents] React error:', error, info.componentStack)
+    const tag = this.props.name ? `[${this.props.name}]` : ''
+    console.error(`[Pixel Agents]${tag} React error:`, error, info.componentStack)
   }
 
   handleRetry = () => {
@@ -30,7 +35,14 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   render() {
-    if (this.state.hasError) {
+    if (this.state.hasError && this.state.error) {
+      // 有自訂 fallback → 子元件層錯誤（不整屏）
+      if (this.props.fallback !== undefined) {
+        return typeof this.props.fallback === 'function'
+          ? this.props.fallback(this.state.error, this.handleRetry)
+          : this.props.fallback
+      }
+
       return (
         <div style={{
           display: 'flex',

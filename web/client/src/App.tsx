@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, lazy, Suspense } from 'react'
 import { OfficeState } from './office/engine/officeState.js'
 import { OfficeCanvas } from './office/components/OfficeCanvas.js'
+import { ErrorBoundary } from './components/ErrorBoundary.js'
 import { ToolOverlay } from './office/components/ToolOverlay.js'
 import { EditorToolbar } from './office/editor/EditorToolbar.js'
 import { EditorState } from './office/editor/editorState.js'
@@ -297,26 +298,44 @@ function App() {
         width: '100%',
         height: '100%',
       }}>
-        <OfficeCanvas
-          officeState={officeState}
-          onClick={interaction.handleClick}
-          isEditMode={editor.isEditMode}
-          editorState={editorState}
-          onEditorTileAction={editor.handleEditorTileAction}
-          onEditorEraseAction={editor.handleEditorEraseAction}
-          onEditorSelectionChange={editor.handleEditorSelectionChange}
-          onDeleteSelected={editor.handleDeleteSelected}
-          onRotateSelected={editor.handleRotateSelected}
-          onDragMove={editor.handleDragMove}
-          editorTick={editor.editorTick}
-          zoom={editor.zoom}
-          onZoomChange={editor.handleZoomChange}
-          panRef={editor.panRef}
-          dayNightEnabled={display.dayNightEnabled}
-          dayNightTimeOverride={display.dayNightTimeOverride}
-          onContextMenu={interaction.handleContextMenu}
-          recorder={recorderInstance}
-        />
+        <ErrorBoundary
+          name="OfficeCanvas"
+          fallback={(err, retry) => (
+            <div style={{ padding: 24, color: 'var(--pixel-text)', fontFamily: 'var(--pixel-font)' }}>
+              <div style={{ marginBottom: 8 }}>辦公室畫面發生錯誤</div>
+              <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 12 }}>{err.message}</div>
+              <button
+                onClick={retry}
+                style={{
+                  background: 'var(--pixel-accent)', color: 'var(--pixel-bg)',
+                  border: '2px solid var(--pixel-border)', padding: '6px 14px',
+                  cursor: 'pointer', fontFamily: 'var(--pixel-font)',
+                }}
+              >重試</button>
+            </div>
+          )}
+        >
+          <OfficeCanvas
+            officeState={officeState}
+            onClick={interaction.handleClick}
+            isEditMode={editor.isEditMode}
+            editorState={editorState}
+            onEditorTileAction={editor.handleEditorTileAction}
+            onEditorEraseAction={editor.handleEditorEraseAction}
+            onEditorSelectionChange={editor.handleEditorSelectionChange}
+            onDeleteSelected={editor.handleDeleteSelected}
+            onRotateSelected={editor.handleRotateSelected}
+            onDragMove={editor.handleDragMove}
+            editorTick={editor.editorTick}
+            zoom={editor.zoom}
+            onZoomChange={editor.handleZoomChange}
+            panRef={editor.panRef}
+            dayNightEnabled={display.dayNightEnabled}
+            dayNightTimeOverride={display.dayNightTimeOverride}
+            onContextMenu={interaction.handleContextMenu}
+            recorder={recorderInstance}
+          />
+        </ErrorBoundary>
       </div>
       )}
 
@@ -596,15 +615,20 @@ function App() {
       )}
 
       {!panels.isDashboardView && terminal.terminalTabs.length > 0 && (
-        <Suspense fallback={null}>
-          <TerminalPanel
-            tabs={terminal.terminalTabs}
-            activeTabId={terminal.activeTerminalTabId}
-            onSelectTab={terminal.setActiveTerminalTabId}
-            onCloseTab={terminal.handleCloseTerminalTab}
-            onClosePanel={terminal.handleCloseTerminalPanel}
-          />
-        </Suspense>
+        <ErrorBoundary
+          name="TerminalPanel"
+          fallback={null /* 終端崩潰時靜默隱藏，不阻擋主要操作 */}
+        >
+          <Suspense fallback={null}>
+            <TerminalPanel
+              tabs={terminal.terminalTabs}
+              activeTabId={terminal.activeTerminalTabId}
+              onSelectTab={terminal.setActiveTerminalTabId}
+              onCloseTab={terminal.handleCloseTerminalTab}
+              onClosePanel={terminal.handleCloseTerminalPanel}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       {/* Phase 6: 團隊面板 */}
