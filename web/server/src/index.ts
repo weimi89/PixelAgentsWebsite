@@ -1493,16 +1493,12 @@ function handleClientMessage(msg: ClientMessage, sender: MessageSender, socket?:
 			const nickname = socketNicknames.get(socket.id) || 'User';
 			const floorId = socketFloors.get(socket.id) || ctx.building.defaultFloorId;
 			const chatMsg = { nickname, text, ts: now };
-			// 儲存至歷史
-			let history = chatHistory.get(floorId);
-			if (!history) {
-				history = [];
-				chatHistory.set(floorId, history);
-			}
-			history.push(chatMsg);
-			if (history.length > CHAT_HISTORY_MAX) {
-				history.splice(0, history.length - CHAT_HISTORY_MAX);
-			}
+			// 儲存至歷史（不可變模式：避免將來加入 async 驗證時發生 read-modify-write race）
+			const prev = chatHistory.get(floorId) ?? [];
+			const next = prev.length >= CHAT_HISTORY_MAX
+				? [...prev.slice(prev.length - CHAT_HISTORY_MAX + 1), chatMsg]
+				: [...prev, chatMsg];
+			chatHistory.set(floorId, next);
 			// 廣播至同樓層
 			ctx.floorSender(floorId).postMessage({ type: 'chatMessage', ...chatMsg });
 			break;
