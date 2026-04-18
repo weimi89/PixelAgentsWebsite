@@ -266,13 +266,13 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
   )
   const isAnonymous = authRole === 'anonymous'
 
-  // 即時更新工具耗時和工作時長
-  const [, setTick] = useState(0)
+  // 即時更新工具耗時和工作時長 — 儲存時間戳避免 render 中呼叫 Date.now()（violates react purity）
+  const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const activeTools = agentTools[agentId]
     const hasActive = activeTools?.some((tool) => !tool.done)
     if (!hasActive && !startedAt) return
-    const interval = setInterval(() => setTick((n) => n + 1), 1000)
+    const interval = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(interval)
   }, [agentId, agentTools, startedAt])
 
@@ -549,7 +549,7 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
             <div style={{ ...rowStyle, fontSize: `${fs.row}px`, padding: isMobile ? '2px 10px' : rowStyle.padding }}>
               <span style={{ ...labelStyle, fontSize: `${fs.label}px` }}>{t.workDuration}</span>
               <span style={{ ...valueStyle, fontSize: `${fs.value}px`, color: 'var(--pixel-green)' }}>
-                {formatWorkDuration(Date.now() - startedAt)}
+                {formatWorkDuration(now - startedAt)}
               </span>
             </div>
           </>
@@ -649,8 +649,7 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
               const color = getToolColor(tool.status)
               const elapsed = tool.done
                 ? (tool.endTime != null ? Math.floor((tool.endTime - tool.startTime) / 1000) : 0)
-                // eslint-disable-next-line react-hooks/purity -- intentional: real-time elapsed display
-                : Math.floor((Date.now() - tool.startTime) / 1000)
+                : Math.floor((now - tool.startTime) / 1000)
 
               return (
                 <div

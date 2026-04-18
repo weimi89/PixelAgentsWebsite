@@ -14,7 +14,7 @@ function createSocket(): Socket {
   return io(window.location.origin, opts)
 }
 
-let socket: Socket = createSocket()
+const socket: Socket = createSocket()
 
 // 暴露與 vscodeApi.ts 相同的介面，使所有現有程式碼只需最小修改即可運作
 export const vscode = {

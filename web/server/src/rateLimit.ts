@@ -19,14 +19,24 @@ interface RateLimitOptions {
 	windowMs: number;
 	/** 每個視窗內允許的最大請求數 */
 	maxRequests: number;
+	/** store 最大鍵數（預設 10000）— 防止攻擊者用大量偽造 IP 填滿記憶體 */
+	maxKeys?: number;
 }
+
+/** 預設 store 容量上限 */
+const DEFAULT_MAX_KEYS = 10_000;
 
 /**
  * 建立速率限制中間件。
  * 使用簡易固定視窗演算法：每個 IP 在 `windowMs` 內最多允許 `maxRequests` 次請求。
+ *
+ * 記憶體保護：
+ *   - 定期清理過期條目
+ *   - 達到 `maxKeys` 上限時以 FIFO 驅逐最舊的條目（Map 原生保留插入順序）
  */
 export function createRateLimit(options: RateLimitOptions) {
 	const { windowMs, maxRequests } = options;
+	const maxKeys = options.maxKeys ?? DEFAULT_MAX_KEYS;
 	const store = new Map<string, WindowEntry>();
 
 	// 定期清理過期的條目以防止記憶體洩漏
@@ -46,7 +56,11 @@ export function createRateLimit(options: RateLimitOptions) {
 		const entry = store.get(ip);
 
 		if (!entry || now - entry.windowStart > windowMs) {
-			// 新視窗或已過期 — 重設
+			// 新視窗或已過期 — 檢查容量，必要時驅逐最舊條目（FIFO）
+			if (store.size >= maxKeys) {
+				const oldestKey = store.keys().next().value;
+				if (oldestKey !== undefined) store.delete(oldestKey);
+			}
 			store.set(ip, { windowStart: now, count: 1 });
 			next();
 			return;

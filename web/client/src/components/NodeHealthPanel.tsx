@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { ConnectedNodeInfo } from '../types/messages.js'
 import { vscode } from '../socketApi.js'
 import { t } from '../i18n.js'
@@ -52,6 +52,14 @@ function SignalBars({ latencyMs }: { latencyMs: number }) {
 }
 
 export function NodeHealthPanel({ isOpen, onClose, nodes }: NodeHealthPanelProps) {
+  // 1 秒 tick，用於 uptime/連線時長顯示 — 取代 render 內直接呼叫 Date.now()
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!isOpen) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [isOpen])
+
   // 開啟時立即請求節點健康資訊
   useEffect(() => {
     if (isOpen) {
@@ -73,8 +81,6 @@ export function NodeHealthPanel({ isOpen, onClose, nodes }: NodeHealthPanelProps
   }, [isOpen, onClose])
 
   if (!isOpen) return null
-
-  const now = Date.now()
 
   return (
     <>
