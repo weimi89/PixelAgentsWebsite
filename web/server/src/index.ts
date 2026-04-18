@@ -243,6 +243,11 @@ function startTmuxHealthCheck(): void {
 // ── 解析素材根目錄 ──────────────────────────────────────
 
 function findAssetsRoot(): string {
+	// 檢查 0：環境變數覆寫（npx / Docker / 自訂部署優先）
+	const envRoot = process.env['PIXEL_AGENTS_ASSETS_ROOT'];
+	if (envRoot && fs.existsSync(path.join(envRoot, 'assets'))) {
+		return envRoot;
+	}
 	// 檢查 1：web/client/public/（開發模式）
 	const clientPublic = path.join(__dirname, '..', '..', 'client', 'public');
 	if (fs.existsSync(path.join(clientPublic, 'assets'))) {
@@ -260,6 +265,14 @@ function findAssetsRoot(): string {
 	}
 	// 備選：當前目錄
 	return cwd;
+}
+
+/** 解析客戶端靜態資源目錄（client/dist）— 支援環境變數覆寫 */
+function findClientDist(): string | null {
+	const envPath = process.env['PIXEL_AGENTS_CLIENT_DIST'];
+	if (envPath && fs.existsSync(envPath)) return envPath;
+	const defaultPath = path.join(__dirname, '..', '..', 'client', 'dist');
+	return fs.existsSync(defaultPath) ? defaultPath : null;
 }
 
 // ── 主程式 ─────────────────────────────────────────────────────
@@ -466,9 +479,9 @@ async function main(): Promise<void> {
 		});
 	});
 
-	// 提供客戶端靜態檔案（正式環境）
-	const clientDistPath = path.join(__dirname, '..', '..', 'client', 'dist');
-	if (fs.existsSync(clientDistPath)) {
+	// 提供客戶端靜態檔案（正式環境，支援 PIXEL_AGENTS_CLIENT_DIST 覆寫）
+	const clientDistPath = findClientDist();
+	if (clientDistPath) {
 		app.use(express.static(clientDistPath));
 	}
 

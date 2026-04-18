@@ -46,11 +46,30 @@
 
 ## 快速開始
 
-### Web 版本（推薦）
+### 🚀 最快：一鍵啟動 CLI
+
+若已 clone 並 `npm install` 過：
 
 ```bash
-git clone https://github.com/RD-CAT/OnlinePixelAgents.git
-cd OnlinePixelAgents/web
+cd web
+npm run build
+npm run cli                    # 或 node bin/pixel-agents.mjs
+```
+
+伺服器啟動後會自動開啟瀏覽器。常用旗標：
+
+```bash
+npm run cli -- --demo                    # 演示模式（3 個假代理）
+npm run cli -- --demo --demo-agents 8    # 演示 8 個代理
+npm run cli -- --port 8080 --no-open     # 自訂埠、不開瀏覽器
+npm run cli -- --help                    # 所有選項
+```
+
+### Web 版完整建置
+
+```bash
+git clone https://github.com/weimi89/PixelAgentsWebsite.git
+cd PixelAgentsWebsite/web
 npm install
 npm run build
 npm start

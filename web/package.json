@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.0.0",
   "description": "Pixel Agents Web — browser-based pixel art office with AI agents",
+  "bin": {
+    "pixel-agents": "./bin/pixel-agents.mjs"
+  },
   "workspaces": [
     "shared",
     "server",
@@ -21,6 +24,7 @@
     "start": "cd server && npm start",
     "demo": "cd server && DEMO=1 DEMO_AGENTS=5 PORT=13001 node dist/index.js",
     "demo:record": "echo '🎬 Starting recording-ready demo (5 agents, port 13001)...' && cd server && DEMO=1 DEMO_AGENTS=5 PORT=13001 node dist/index.js",
+    "cli": "node bin/pixel-agents.mjs",
     "lint": "npm run lint:client && npm run lint:server",
     "lint:client": "cd client && npx eslint src/",
     "lint:server": "cd server && npx eslint src/",

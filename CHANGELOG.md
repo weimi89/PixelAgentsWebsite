@@ -5,6 +5,23 @@
 ## [Unreleased]
 
 ### 新增
+- **CLI：`pixel-agents` 可執行命令**
+  - `web/bin/pixel-agents.mjs` 零依賴 Node CLI
+  - 自動偵測 server 就緒後開瀏覽器
+  - 支援 `--port` / `--demo` / `--demo-agents` / `--data-dir` / `--no-open` / `--help` / `--version`
+  - 跨平台（macOS `open` / Linux `xdg-open` / Windows `start`）
+  - 環境變數 `PIXEL_AGENTS_CLIENT_DIST` / `PIXEL_AGENTS_ASSETS_ROOT` 可覆寫資源路徑（支援打包部署）
+- `npm run cli` 與 `npm run demo` / `npm run demo:record` 便捷腳本
+
+### 變更
+- Server `findAssetsRoot()` 新增環境變數覆寫（檢查 0 優先級）
+- Server `clientDistPath` 改為 `findClientDist()` 支援環境變數
+
+---
+
+## [之前的變更]
+
+### 新增
 - `/ready` 就緒檢查端點（考量 Redis 連線狀態）
 - ErrorBoundary 支援 `fallback` 與 `name` props；OfficeCanvas 與 TerminalPanel 各自擁有錯誤邊界
 - `gameLoop` 逐幀 try/catch（同類錯誤 60s 內僅記錄一次）
