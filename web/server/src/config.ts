@@ -50,4 +50,6 @@ export const config = {
 	clusterEnabled: !!process.env['REDIS_URL'],
 	/** 註冊策略：open（開放）、invite（邀請制）、closed（僅管理員可建立帳號） */
 	registrationPolicy: (process.env['REGISTRATION_POLICY'] || REGISTRATION_POLICY_DEFAULT) as 'open' | 'invite' | 'closed',
+	/** 是否強制要求密碼含特殊字元（REQUIRE_PASSWORD_SPECIAL_CHAR=1 啟用） */
+	requirePasswordSpecialChar: process.env['REQUIRE_PASSWORD_SPECIAL_CHAR'] === '1',
 } as const;

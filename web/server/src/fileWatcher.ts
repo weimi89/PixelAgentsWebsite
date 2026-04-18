@@ -150,31 +150,34 @@ function readGeminiSession(agentId: number, ctx: AgentContext): void {
 
 	const sender = ctx.floorSender(agent.floorId);
 	try {
-		// 先檢查檔案是否有變更（用大小變化判斷）
 		const stat = fs.statSync(agent.jsonlFile);
-		// 用 lineBuffer 儲存上次的檔案大小（字串形式複用欄位）
-		const lastSize = parseInt(agent.lineBuffer || '0', 10);
+		const lastSize = agent.geminiLastSize ?? 0;
 		if (stat.size === lastSize) return;
-		agent.lineBuffer = String(stat.size);
 
+		const processedCount = agent.geminiMessageCount ?? 0;
 		let newMessages: Array<Record<string, unknown>> | null = null;
+		let nextMessageCount = processedCount;
 
-		// 大檔案優化：嘗試尾部讀取（Task 2.3）
-		if (stat.size > GEMINI_LARGE_FILE_THRESHOLD_BYTES && lastSize > 0 && agent.fileOffset > 0) {
+		// 大檔案優化：嘗試尾部讀取（僅當已有基準 size 與處理過的訊息）
+		if (stat.size > GEMINI_LARGE_FILE_THRESHOLD_BYTES && lastSize > 0 && processedCount > 0) {
 			newMessages = tryGeminiTailRead(agent.jsonlFile, lastSize, stat.size);
 			if (newMessages) {
-				agent.fileOffset += newMessages.length;
+				nextMessageCount = processedCount + newMessages.length;
 			}
 		}
 
-		// 尾部讀取失敗或小檔案 — 全量讀取
+		// 尾部讀取失敗或小檔案 — 全量讀取（權威來源，重設 watermark）
 		if (!newMessages) {
 			const content = fs.readFileSync(agent.jsonlFile, 'utf-8');
 			const session = JSON.parse(content);
 			const messages = session.messages as Array<Record<string, unknown>> || [];
-			newMessages = messages.slice(agent.fileOffset);
-			agent.fileOffset = messages.length;
+			newMessages = messages.slice(processedCount);
+			nextMessageCount = messages.length;
 		}
+
+		// 所有讀取成功後才更新 watermark，避免中途失敗造成狀態不一致
+		agent.geminiLastSize = stat.size;
+		agent.geminiMessageCount = nextMessageCount;
 
 		if (newMessages.length > 0) {
 			cancelWaitingTimer(agentId, waitingTimers);
@@ -186,7 +189,6 @@ function readGeminiSession(agentId: number, ctx: AgentContext): void {
 		}
 
 		for (const msg of newMessages) {
-			// 包裝為 JSON 字串再送入 processTranscriptLine（保持統一入口）
 			processTranscriptLine(agentId, JSON.stringify(msg), ctx);
 		}
 	} catch (e) {
@@ -289,6 +291,16 @@ export function ensureProjectScan(
 		}, interval);
 	}
 	scheduleNextScan();
+}
+
+/** 停止定期專案掃描（動態關閉或重啟時使用） */
+export function stopProjectScan(
+	projectScanTimerRef: { current: ReturnType<typeof setTimeout> | null },
+): void {
+	if (projectScanTimerRef.current) {
+		clearTimeout(projectScanTimerRef.current);
+		projectScanTimerRef.current = null;
+	}
 }
 
 /**
@@ -520,6 +532,8 @@ export function reassignAgentToFile(
 	ctx.trackedJsonlFiles.set(newFilePath, agentId);
 	agent.fileOffset = 0;
 	agent.lineBuffer = '';
+	agent.geminiLastSize = 0;
+	agent.geminiMessageCount = 0;
 	persistAgents();
 
 	startFileWatching(agentId, newFilePath, ctx);

@@ -64,6 +64,10 @@ export interface AgentState {
 	teamName: string | null;
 	/** 此代理的 CLI 類型（claude/codex/gemini） */
 	cliType: string;
+	/** Gemini 專用：上次已處理的檔案大小（byte）；避免與 Claude 的 lineBuffer 欄位語意混用 */
+	geminiLastSize?: number;
+	/** Gemini 專用：已處理的訊息數（messages 陣列索引的 watermark） */
+	geminiMessageCount?: number;
 	/** 代理建立（開始工作）的時間戳（ms） */
 	startedAt: number;
 	/** 代理成長追蹤資料 */

@@ -15,11 +15,20 @@ const MAX_ANONYMOUS_CONNECTIONS_PER_IP = 5;
 /** 每 IP 的匿名連線計數 */
 const anonymousConnectionCounts = new Map<string, number>();
 
-/** 取得 socket 的用戶端 IP（考慮反向代理） */
+/** 取得 socket 的用戶端 IP：
+ *  - 僅在 TRUST_PROXY 環境變數設定時才信任 x-forwarded-for
+ *  - 取第一個 hop（最原始客戶端），避免攻擊者追加多個偽造 IP 繞過每 IP 限制
+ */
 function getSocketIp(socket: Socket): string {
-	return socket.handshake.headers['x-forwarded-for'] as string
-		|| socket.handshake.address
-		|| 'unknown';
+	if (process.env['TRUST_PROXY']) {
+		const header = socket.handshake.headers['x-forwarded-for'];
+		const raw = Array.isArray(header) ? header[0] : header;
+		if (raw) {
+			const first = raw.split(',')[0]?.trim();
+			if (first) return first;
+		}
+	}
+	return socket.handshake.address || 'unknown';
 }
 
 /** 增加指定 IP 的匿名連線計數 */

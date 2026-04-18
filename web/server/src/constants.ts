@@ -75,6 +75,10 @@ export const AUTH_TOKEN_EXPIRY_DAYS = 30;
 export const PASSWORD_MIN_LENGTH = 8;
 export const JWT_SECRET_FILE_NAME = 'jwt-secret.key';
 export const USERS_FILE_NAME = 'users.json';
+/** bcrypt 雜湊 cost 因子（rounds）— 提升至 12 抵抗 GPU 暴力破解 */
+export const BCRYPT_SALT_ROUNDS = 12;
+/** API Key 公開回傳時保留的尾碼長度（其餘以 * 遮蔽） */
+export const API_KEY_MASK_TAIL_LENGTH = 4;
 
 // ── 聊天 ──────────────────────────────────────────────────────
 export const CHAT_MESSAGE_MAX_LENGTH = 100;
@@ -101,6 +105,8 @@ export const GIT_ROOT_MAX_DEPTH = 50; // findGitRoot 最大向上搜尋深度（
 export const AGENT_NODE_HEARTBEAT_INTERVAL_MS = 30_000; // Agent Node 每 30s 發送一次心跳
 export const AGENT_NODE_HEARTBEAT_TIMEOUT_MS = 90_000; // 90s 無心跳視為斷線
 export const NODE_HEALTH_BROADCAST_INTERVAL_MS = 10_000; // 每 10s 廣播節點健康狀態
+/** Agent Node 斷線後保留代理狀態的寬限時間（ms）— 短暫抖動重連時能無縫恢復 */
+export const AGENT_NODE_RECONNECT_GRACE_MS = 30_000;
 
 // ── 統計刷新 ──────────────────────────────────────────────────
 export const STATS_FLUSH_INTERVAL_MS = 30_000; // 統計資料髒旗標檢查間隔

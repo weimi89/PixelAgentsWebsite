@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { LAYOUT_FILE_DIR, USERS_FILE_NAME, JWT_SECRET_FILE_NAME } from '../constants.js';
+import { LAYOUT_FILE_DIR, USERS_FILE_NAME, JWT_SECRET_FILE_NAME, BCRYPT_SALT_ROUNDS, API_KEY_MASK_TAIL_LENGTH } from '../constants.js';
 import { atomicWriteJson } from '../atomicWrite.js';
 import { db } from '../db/database.js';
 
@@ -18,22 +18,37 @@ const IV_LENGTH = 12;
 /** Auth tag 長度（位元組） */
 const AUTH_TAG_LENGTH = 16;
 
-/** 取得加密密鑰：優先從環境變數，退回 JWT secret */
+/** 取得加密密鑰：優先從環境變數，退回 JWT secret — 兩者皆無則拋錯而非 fallback 到硬編碼常數 */
 function getEncryptionKey(): Buffer {
 	const envKey = process.env['API_KEY_ENCRYPTION_KEY'];
 	if (envKey) {
-		// 將字串雜湊為 32 位元組密鑰
 		return crypto.createHash('sha256').update(envKey).digest();
 	}
-	// 退回使用 JWT secret
 	const secretPath = path.join(userDir, JWT_SECRET_FILE_NAME);
-	try {
-		const jwtSecret = fs.readFileSync(secretPath, 'utf-8').trim();
-		return crypto.createHash('sha256').update(jwtSecret).digest();
-	} catch {
-		// 若 JWT secret 也不存在，使用固定種子（不應發生於正常流程）
-		return crypto.createHash('sha256').update('pixel-agents-default-key').digest();
+	const jwtSecret = fs.readFileSync(secretPath, 'utf-8').trim();
+	if (!jwtSecret) {
+		throw new Error(`JWT secret file is empty: ${secretPath}`);
 	}
+	return crypto.createHash('sha256').update(jwtSecret).digest();
+}
+
+/** 常數時間比對：避免以 === 比對明文 API Key 造成 timing attack */
+function timingSafeEqualStr(a: string, b: string): boolean {
+	const bufA = Buffer.from(a, 'utf-8');
+	const bufB = Buffer.from(b, 'utf-8');
+	if (bufA.length !== bufB.length) return false;
+	return crypto.timingSafeEqual(bufA, bufB);
+}
+
+/** 遮蔽 API Key：僅保留前綴 `pa_` 與尾碼 N 字元，其餘以 * 取代 */
+export function maskApiKey(apiKey: string): string {
+	if (!apiKey) return '';
+	const tail = API_KEY_MASK_TAIL_LENGTH;
+	if (apiKey.length <= tail + 3) return '*'.repeat(apiKey.length);
+	const prefix = apiKey.startsWith('pa_') ? 'pa_' : '';
+	const suffix = apiKey.slice(-tail);
+	const maskedLen = apiKey.length - prefix.length - tail;
+	return `${prefix}${'*'.repeat(maskedLen)}${suffix}`;
 }
 
 /** 加密 API Key — 回傳格式 enc:iv:authTag:ciphertext（全為 hex） */
@@ -237,7 +252,7 @@ export async function createUser(
 		if (existing) {
 			throw new Error('Username already exists');
 		}
-		const passwordHash = await bcrypt.hash(password, 10);
+		const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 		const id = generateId();
 		const role = options?.role ?? 'admin';
 		const mustChangePassword = options?.mustChangePassword ?? false;
@@ -264,7 +279,7 @@ export async function createUser(
 	if (existing) {
 		throw new Error('Username already exists');
 	}
-	const passwordHash = await bcrypt.hash(password, 10);
+	const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 	const user: StoredUser = {
 		id: generateId(),
 		username,
@@ -323,7 +338,7 @@ export function verifyApiKey(apiKey: string): StoredUser | null {
 			if (!row.api_key) continue;
 			try {
 				const plain = decryptApiKey(row.api_key);
-				if (plain === apiKey) {
+				if (timingSafeEqualStr(plain, apiKey)) {
 					// 更新快取
 					updateApiKeyCache(plain, row.id);
 					// 透過 getUserById 取得完整的 StoredUser
@@ -344,7 +359,7 @@ export function verifyApiKey(apiKey: string): StoredUser | null {
 	for (const u of data.users) {
 		try {
 			const plain = decryptApiKey(u.apiKey);
-			if (plain === apiKey) {
+			if (timingSafeEqualStr(plain, apiKey)) {
 				updateApiKeyCache(plain, u.id);
 				return { ...u, apiKey: plain };
 			}

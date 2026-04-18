@@ -27,8 +27,17 @@ const DEFAULT_SOUND_CONFIG: SoundConfig = {
 let soundConfig: SoundConfig = { ...DEFAULT_SOUND_CONFIG }
 let audioCtx: AudioContext | null = null
 
+/** 當 master 關閉時暫停（非銷毀）AudioContext — 釋放音訊硬體資源 */
+function applyMasterState(): void {
+  if (!audioCtx) return
+  if (!soundConfig.master && audioCtx.state === 'running') {
+    audioCtx.suspend().catch(() => { /* ignore */ })
+  }
+}
+
 export function setSoundConfig(config: Partial<SoundConfig>): void {
   soundConfig = { ...soundConfig, ...config }
+  applyMasterState()
 }
 
 export function getSoundConfig(): SoundConfig {
@@ -38,10 +47,22 @@ export function getSoundConfig(): SoundConfig {
 /** 向後相容：舊 soundEnabled boolean 轉為新格式 */
 export function setSoundEnabled(enabled: boolean): void {
   soundConfig.master = enabled
+  applyMasterState()
 }
 
 export function isSoundEnabled(): boolean {
   return soundConfig.master
+}
+
+/** 完全釋放 AudioContext（例如頁面卸載時）。下次播放會重新建立。 */
+export function closeAudio(): void {
+  if (!audioCtx) return
+  try {
+    audioCtx.close().catch(() => { /* ignore */ })
+  } catch {
+    // 某些瀏覽器 close() 為同步
+  }
+  audioCtx = null
 }
 
 function playNote(ctx: AudioContext, freq: number, startOffset: number, volume = NOTIFICATION_VOLUME, duration = NOTIFICATION_NOTE_DURATION_SEC): void {

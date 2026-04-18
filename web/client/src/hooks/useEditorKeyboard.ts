@@ -40,16 +40,22 @@ export function useEditorKeyboard(
         editorState.clearDrag()
         onEditorTick()
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        // 避免 Backspace 觸發瀏覽器「返回上一頁」的歷史行為
+        e.preventDefault()
         if (editorState.selectedFurnitureUid) {
           onDeleteSelected()
         }
       } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault()
         onRotateSelected()
       } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault()
         onFlipSelected()
       } else if (e.key === 'v' || e.key === 'V') {
+        e.preventDefault()
         onVFlipSelected()
       } else if (e.key === 't' || e.key === 'T') {
+        e.preventDefault()
         onToggleState()
       } else if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
         e.preventDefault()

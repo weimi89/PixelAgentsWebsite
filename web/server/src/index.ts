@@ -282,6 +282,23 @@ async function main(): Promise<void> {
 	// 設定 Express + Socket.IO
 	const app = express();
 
+	// trust proxy：僅在明確設定 TRUST_PROXY 環境變數時啟用，避免預設信任偽造的 X-Forwarded-For
+	// 值可為 'true'、數字（代理層級）、或 IP/CIDR（逗號分隔）。未設定 = 不信任任何代理（req.ip 僅取 socket 真實 IP）。
+	const trustProxyEnv = process.env['TRUST_PROXY'];
+	if (trustProxyEnv) {
+		const numeric = Number(trustProxyEnv);
+		if (trustProxyEnv === 'true') {
+			app.set('trust proxy', true);
+		} else if (Number.isFinite(numeric)) {
+			app.set('trust proxy', numeric);
+		} else {
+			app.set('trust proxy', trustProxyEnv);
+		}
+		logger.info(`trust proxy enabled: ${trustProxyEnv}`);
+	} else {
+		app.set('trust proxy', false);
+	}
+
 	// ── 選擇性 HTTPS 支援 ─────────────────────────────────────
 	const useHttps = config.https;
 	let httpServer: ReturnType<typeof createServer>;
@@ -846,6 +863,19 @@ function handleTerminalConnection(ws: WebSocket): void {
 	let attachedAgentId: number | null = null;
 	/** 遠端代理的 sessionId（中繼模式下使用） */
 	let remoteSessionId: string | null = null;
+	/** pty 的 data/exit 事件訂閱句柄，replace 或關閉時需 dispose 避免送往已釋放的 WebSocket */
+	let ptyDisposables: Array<{ dispose(): void }> = [];
+
+	function teardownPty(): void {
+		for (const d of ptyDisposables) {
+			try { d.dispose(); } catch { /* ignore */ }
+		}
+		ptyDisposables = [];
+		if (pty) {
+			try { pty.kill(); } catch { /* ignore */ }
+			pty = null;
+		}
+	}
 
 	ws.on('message', (raw) => {
 		// 所有客戶端→伺服器訊息皆為 JSON 文字
@@ -858,11 +888,8 @@ function handleTerminalConnection(ws: WebSocket): void {
 
 		switch (msg.type) {
 			case 'attach': {
-				// 清除先前的連線
-				if (pty) {
-					pty.kill();
-					pty = null;
-				}
+				// 清除先前的連線（先 dispose listener 再 kill，避免舊 pty 事件送往已替換的 ws）
+				teardownPty();
 				if (remoteSessionId) {
 					detachRemoteTerminal(remoteSessionId);
 					remoteSessionId = null;
@@ -912,18 +939,19 @@ function handleTerminalConnection(ws: WebSocket): void {
 				attachedAgentId = agentId;
 				trackPty(newPty);
 
-				newPty.onData((data: string) => {
+				ptyDisposables.push(newPty.onData((data: string) => {
 					if (ws.readyState === 1 /* WebSocket.OPEN */) {
 						ws.send(Buffer.from(data, 'utf-8'));
 					}
-				});
-				newPty.onExit(({ exitCode }) => {
+				}));
+				ptyDisposables.push(newPty.onExit(({ exitCode }) => {
 					if (ws.readyState === 1) {
 						ws.send(JSON.stringify({ type: 'exit', code: exitCode }));
 					}
 					pty = null;
 					attachedAgentId = null;
-				});
+					ptyDisposables = [];
+				}));
 
 				ws.send(JSON.stringify({ type: 'attached', agentId }));
 				console.log(`[Pixel Agents] Terminal attached to agent ${agentId} (tmux: ${agent.tmuxSessionName})`);
@@ -952,10 +980,7 @@ function handleTerminalConnection(ws: WebSocket): void {
 					detachRemoteTerminal(remoteSessionId);
 					remoteSessionId = null;
 				}
-				if (pty) {
-					pty.kill();
-					pty = null;
-				}
+				teardownPty();
 				attachedAgentId = null;
 				ws.send(JSON.stringify({ type: 'detached' }));
 				break;
@@ -968,10 +993,7 @@ function handleTerminalConnection(ws: WebSocket): void {
 			detachRemoteTerminal(remoteSessionId);
 			remoteSessionId = null;
 		}
-		if (pty) {
-			pty.kill();
-			pty = null;
-		}
+		teardownPty();
 		if (attachedAgentId !== null) {
 			console.log(`[Pixel Agents] Terminal disconnected from agent ${attachedAgentId}`);
 		}

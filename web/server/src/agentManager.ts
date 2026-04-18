@@ -419,6 +419,15 @@ export function removeAgent(
 	cancelWaitingTimer(agentId, waitingTimers);
 	cancelPermissionTimer(agentId, permissionTimers);
 
+	// 清理直接子進程的事件監聽，避免舊 proc 在移除代理後仍 emit 導致殭屍 listener 或 MaxListeners 警告
+	if (agent.process) {
+		agent.process.stdout?.removeAllListeners('data');
+		agent.process.stderr?.removeAllListeners('data');
+		agent.process.removeAllListeners('error');
+		agent.process.removeAllListeners('exit');
+		agent.process.removeAllListeners('close');
+	}
+
 	ctx.trackedJsonlFiles.delete(agent.jsonlFile);
 	if (agent.remoteSessionId) {
 		ctx.remoteAgentMap.delete(agent.remoteSessionId);

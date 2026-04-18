@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as fs from 'fs';
 
 /**
  * 路徑安全工具 — 防止路徑遍歷攻擊。
@@ -78,6 +79,22 @@ export function validatePathWithinRoot(userPath: string, rootDir: string): PathV
 	// 確保解析後的路徑以根目錄開頭
 	if (!resolved.startsWith(normalizedRoot + path.sep) && resolved !== normalizedRoot) {
 		return { valid: false, error: 'Path escapes the allowed root directory' };
+	}
+
+	// 解析符號連結以防 `ln -s /etc/passwd <root>/link` 類型的逃逸
+	// 僅對已存在的路徑檢查 realpath；不存在的路徑交由呼叫者在寫入前再驗證。
+	try {
+		if (fs.existsSync(resolved)) {
+			const realPath = fs.realpathSync(resolved);
+			const realRoot = fs.realpathSync(normalizedRoot);
+			if (!realPath.startsWith(realRoot + path.sep) && realPath !== realRoot) {
+				return { valid: false, error: 'Path resolves (via symlink) outside the allowed root directory' };
+			}
+			return { valid: true, normalized: realPath };
+		}
+	} catch {
+		// realpath 失敗（權限等）→ 保守拒絕
+		return { valid: false, error: 'Unable to verify real path' };
 	}
 
 	return { valid: true, normalized: resolved };

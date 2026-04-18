@@ -47,6 +47,28 @@ function getAuditLogPath(): string {
 	return path.join(userDir, AUDIT_LOG_FILE_NAME);
 }
 
+/**
+ * 遮蔽 detail 字串中可能的敏感資訊（密碼、token、API Key 等）。
+ * 同時處理 `key=value` 與 JSON-style `"key":"value"` 兩種型式。
+ * 呼叫方應避免傳入敏感欄位；此函式為最後一道防線。
+ */
+const SENSITIVE_KEY_PATTERN = /(password|passwd|pwd|token|secret|apikey|api_key|authorization|auth|cookie|session)/i;
+
+function redactSensitive(detail: string): string {
+	// 形式 1：key=value （以空白、& 或行尾分隔）
+	let redacted = detail.replace(
+		/([A-Za-z_]+)=([^\s&]+)/g,
+		(match, key: string, _value: string) => SENSITIVE_KEY_PATTERN.test(key) ? `${key}=***` : match,
+	);
+	// 形式 2："key":"value" 或 'key':'value'
+	redacted = redacted.replace(
+		/(["'])([A-Za-z_]+)\1\s*:\s*(["'])([^"']*)\3/g,
+		(match, q1: string, key: string, q2: string, _value: string) =>
+			SENSITIVE_KEY_PATTERN.test(key) ? `${q1}${key}${q1}:${q2}***${q2}` : match,
+	);
+	return redacted;
+}
+
 /** 確保目錄存在 */
 function ensureDir(): void {
 	if (!fs.existsSync(userDir)) {
@@ -86,10 +108,13 @@ export function logAudit(
 	detail?: string,
 	ip?: string,
 ): void {
+	// 最後一道防線：遮蔽 detail 中可能混入的敏感欄位（password/token/apikey 等）
+	const safeDetail = detail ? redactSensitive(detail) : detail;
+
 	// 優先寫入 SQLite
 	if (db) {
 		try {
-			db.addAuditEntry(action, userId, detail, ip);
+			db.addAuditEntry(action, userId, safeDetail, ip);
 			return;
 		} catch (err) {
 			console.error('[Pixel Agents] Audit log DB write failed:', err);
@@ -103,7 +128,7 @@ export function logAudit(
 		action,
 	};
 	if (userId) entry.userId = userId;
-	if (detail) entry.detail = detail;
+	if (safeDetail) entry.detail = safeDetail;
 	if (ip) entry.ip = ip;
 
 	const line = JSON.stringify(entry) + '\n';

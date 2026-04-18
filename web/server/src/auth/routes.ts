@@ -13,7 +13,9 @@ import {
 	updateUserRole,
 	deleteUser,
 	regenerateApiKey,
+	maskApiKey,
 } from './userStore.js';
+import { BCRYPT_SALT_ROUNDS } from '../constants.js';
 import { signToken, signAccessToken, signRefreshToken, verifyToken, verifyRefreshToken } from './jwt.js';
 import type { TokenPayload } from './jwt.js';
 import { validatePassword } from 'pixel-agents-shared';
@@ -117,7 +119,7 @@ router.post('/register', optionalAuth, async (req, res) => {
 			res.status(400).json({ error: 'Username must be 2-32 characters' });
 			return;
 		}
-		const validation = validatePassword(password);
+		const validation = validatePassword(password, { requireSpecial: config.requirePasswordSpecialChar });
 		if (!validation.valid) {
 			res.status(400).json({ error: validation.error });
 			return;
@@ -278,7 +280,7 @@ router.post('/change-password', requireAuth, async (req, res) => {
 			res.status(400).json({ error: 'Old password and new password are required' });
 			return;
 		}
-		const validation = validatePassword(newPassword);
+		const validation = validatePassword(newPassword, { requireSpecial: config.requirePasswordSpecialChar });
 		if (!validation.valid) {
 			res.status(400).json({ error: validation.error });
 			return;
@@ -290,7 +292,7 @@ router.post('/change-password', requireAuth, async (req, res) => {
 			return;
 		}
 		// 更新密碼
-		const newHash = await bcrypt.hash(newPassword, 10);
+		const newHash = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
 		updateUserPassword(user.username, newHash);
 		clearMustChangePassword(user.username);
 		// 簽發新 token（不含 mustChangePassword 標記）
@@ -335,7 +337,8 @@ router.post('/api-key/regenerate', requireAuth, (req, res) => {
 
 router.get('/users', requireAuth, requireAdmin, (_req, res) => {
 	try {
-		const users = listUsers();
+		// 僅回傳遮蔽後的 API Key（防止 admin 介面誤傳/截圖洩漏）
+		const users = listUsers().map(u => ({ ...u, apiKey: maskApiKey(u.apiKey) }));
 		res.json({ users });
 	} catch {
 		res.status(500).json({ error: 'Failed to list users' });

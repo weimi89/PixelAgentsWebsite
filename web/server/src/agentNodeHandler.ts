@@ -11,6 +11,7 @@ import {
 	MAX_TRANSCRIPT_LOG,
 	TOOL_DONE_DELAY_MS,
 	AGENT_NODE_HEARTBEAT_TIMEOUT_MS,
+	AGENT_NODE_RECONNECT_GRACE_MS,
 } from './constants.js';
 
 interface SocketData {
@@ -53,6 +54,9 @@ let heartbeatCheckInterval: ReturnType<typeof setInterval> | null = null;
 
 /** Agent Node namespace 參考（供外部廣播使用） */
 let agentNodeNamespace: ReturnType<Server['of']> | null = null;
+
+/** 斷線代理的寬限期：sessionId → 清除計時器。在此期間同一 sessionId 重新連入可無縫恢復。 */
+const orphanedRemoteAgents = new Map<string, { agentId: number; timer: ReturnType<typeof setTimeout> }>();
 
 /** 設定 Agent Node 的 Socket.IO namespace（/agent-node） */
 export function setupAgentNodeNamespace(io: Server, ctx: AgentContext): void {
@@ -98,19 +102,38 @@ export function setupAgentNodeNamespace(io: Server, ctx: AgentContext): void {
 		});
 
 		socket.on('disconnect', () => {
-			console.log(`[Pixel Agents] Agent Node disconnected: ${username} (${socket.id})`);
-			// 清理此 socket 的所有終端中繼
+			console.log(`[Pixel Agents] Agent Node disconnected: ${username} (${socket.id}) — entering ${AGENT_NODE_RECONNECT_GRACE_MS / 1000}s grace`);
+			// 清理此 socket 的所有終端中繼（終端需要立即釋放，不走 grace）
 			cleanupTerminalRelaysForSocket(socket.id);
-			// 清除此 socket 擁有的所有遠端代理
+
+			// 將此 socket 擁有的代理標記為 orphaned；grace 期內重新連入可恢復
 			for (const sessionId of socket.data.ownedSessions) {
 				const agentId = ctx.remoteAgentMap.get(sessionId);
 				if (agentId === undefined) continue;
 				const agent = ctx.agents.get(agentId);
 				if (!agent) continue;
-				const floorId = agent.floorId;
-				removeAgent(agentId, ctx);
-				ctx.remoteAgentMap.delete(sessionId);
-				ctx.floorSender(floorId).postMessage({ type: 'agentClosed', id: agentId });
+				// 視覺上標記為 detached（前端可顯示斷線指示）
+				agent.isDetached = true;
+				ctx.floorSender(agent.floorId).postMessage({ type: 'agentDetached', id: agentId, detached: true });
+
+				// 若已有舊 grace timer（少見：同 sessionId 連續兩次 disconnect），先清掉
+				const prev = orphanedRemoteAgents.get(sessionId);
+				if (prev) clearTimeout(prev.timer);
+
+				const timer = setTimeout(() => {
+					orphanedRemoteAgents.delete(sessionId);
+					const stillAgentId = ctx.remoteAgentMap.get(sessionId);
+					if (stillAgentId === undefined) return;
+					const stillAgent = ctx.agents.get(stillAgentId);
+					if (!stillAgent) return;
+					console.log(`[Pixel Agents] Grace expired, removing orphaned remote agent ${stillAgentId} (session: ${sessionId})`);
+					const floorId = stillAgent.floorId;
+					removeAgent(stillAgentId, ctx);
+					ctx.remoteAgentMap.delete(sessionId);
+					ctx.floorSender(floorId).postMessage({ type: 'agentClosed', id: stillAgentId });
+					ctx.broadcastFloorSummaries();
+				}, AGENT_NODE_RECONNECT_GRACE_MS);
+				orphanedRemoteAgents.set(sessionId, { agentId, timer });
 			}
 			socket.data.ownedSessions.clear();
 			ctx.broadcastFloorSummaries();
@@ -140,6 +163,11 @@ export function cleanupAgentNodeHeartbeat(): void {
 		clearInterval(heartbeatCheckInterval);
 		heartbeatCheckInterval = null;
 	}
+	// 一併清除所有待決的 orphan grace timer（伺服器關閉時不應再觸發）
+	for (const { timer } of orphanedRemoteAgents.values()) {
+		clearTimeout(timer);
+	}
+	orphanedRemoteAgents.clear();
 }
 
 /** 取得所有已連線的 Agent Node 摘要 */
@@ -397,6 +425,34 @@ function handleAgentNodeEvent(
 
 	switch (event.type) {
 		case 'agentStarted': {
+			// 若有 orphan 記錄（前次斷線尚在 grace 內），取消清除計時器並恢復代理綁定
+			const orphan = orphanedRemoteAgents.get(event.sessionId);
+			if (orphan) {
+				clearTimeout(orphan.timer);
+				orphanedRemoteAgents.delete(event.sessionId);
+				const existingAgent = ctx.agents.get(orphan.agentId);
+				if (existingAgent) {
+					existingAgent.isDetached = false;
+					existingAgent.owner = username;
+					existingAgent.ownerId = socket.data.user.userId;
+					socket.data.ownedSessions.add(event.sessionId);
+					console.log(`[Pixel Agents] Remote agent ${orphan.agentId} recovered from grace (session: ${event.sessionId})`);
+					socket.emit('message', {
+						type: 'agentRegistered',
+						sessionId: event.sessionId,
+						agentId: orphan.agentId,
+					} satisfies ServerNodeMessage);
+					ctx.floorSender(existingAgent.floorId).postMessage({
+						type: 'agentDetached',
+						id: orphan.agentId,
+						detached: false,
+					});
+					ctx.broadcastFloorSummaries();
+					return;
+				}
+				// 代理實際已被移除 — 繼續走建立新代理的流程
+			}
+
 			// 如果此 sessionId 已經有代理，忽略
 			if (ctx.remoteAgentMap.has(event.sessionId)) return;
 
@@ -463,6 +519,12 @@ function handleAgentNodeEvent(
 		}
 
 		case 'agentStopped': {
+			// 明確停止 → 取消 grace timer（如有）
+			const orphan = orphanedRemoteAgents.get(event.sessionId);
+			if (orphan) {
+				clearTimeout(orphan.timer);
+				orphanedRemoteAgents.delete(event.sessionId);
+			}
 			const agentId = ctx.remoteAgentMap.get(event.sessionId);
 			if (agentId === undefined) return;
 			const agent = ctx.agents.get(agentId);
