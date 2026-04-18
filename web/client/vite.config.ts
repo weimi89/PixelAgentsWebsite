@@ -6,6 +6,17 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // 將 React 核心拆出，使其得以獨立快取（更新頻率低）
+          'react-vendor': ['react', 'react-dom', 'react-dom/client'],
+          // Socket.IO 也獨立一個 chunk
+          'socket-vendor': ['socket.io-client'],
+        },
+      },
+    },
   },
   server: {
     proxy: {

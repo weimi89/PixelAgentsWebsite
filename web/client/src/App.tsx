@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, lazy, Suspense } from 'react'
 import { OfficeState } from './office/engine/officeState.js'
 import { OfficeCanvas } from './office/components/OfficeCanvas.js'
 import { ToolOverlay } from './office/components/ToolOverlay.js'
@@ -25,7 +25,10 @@ import { ChatPanel } from './components/ChatPanel.js'
 import { AgentDetailPanel } from './components/AgentDetailPanel.js'
 import { ContextMenu } from './components/ContextMenu.js'
 import type { ContextMenuAction } from './components/ContextMenu.js'
-import { TerminalPanel } from './components/TerminalPanel.js'
+// TerminalPanel 包含重量級 xterm.js 依賴，延後至實際使用時才載入
+const TerminalPanel = lazy(() =>
+  import('./components/TerminalPanel.js').then(m => ({ default: m.TerminalPanel })),
+)
 import { BehaviorEditorModal } from './components/BehaviorEditorModal.js'
 import { LayoutTemplatesPanel } from './components/LayoutTemplatesPanel.js'
 import { RecordingListModal } from './components/RecordingListModal.js'
@@ -593,13 +596,15 @@ function App() {
       )}
 
       {!panels.isDashboardView && terminal.terminalTabs.length > 0 && (
-        <TerminalPanel
-          tabs={terminal.terminalTabs}
-          activeTabId={terminal.activeTerminalTabId}
-          onSelectTab={terminal.setActiveTerminalTabId}
-          onCloseTab={terminal.handleCloseTerminalTab}
-          onClosePanel={terminal.handleCloseTerminalPanel}
-        />
+        <Suspense fallback={null}>
+          <TerminalPanel
+            tabs={terminal.terminalTabs}
+            activeTabId={terminal.activeTerminalTabId}
+            onSelectTab={terminal.setActiveTerminalTabId}
+            onCloseTab={terminal.handleCloseTerminalTab}
+            onClosePanel={terminal.handleCloseTerminalPanel}
+          />
+        </Suspense>
       )}
 
       {/* Phase 6: 團隊面板 */}
