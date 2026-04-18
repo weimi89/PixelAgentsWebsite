@@ -295,6 +295,39 @@ export const BottomToolbar = memo(function BottomToolbar({
     </button>
   )
 
+  // 編輯模式極簡工具列：只顯示「退出編輯」+ 樓層切換
+  // 避免與 OfficeCanvas 內的編輯工具列（地板/牆壁/清除/家具）兩排重疊
+  if (isEditMode && canEditLayout) {
+    return (
+      <div role="toolbar" aria-label={t.editOfficeLayout} className="pixel-bottom-toolbar" style={panelStyle}>
+        <button
+          onClick={onToggleEditMode}
+          onMouseEnter={() => setHovered('exit-edit')}
+          onMouseLeave={() => setHovered(null)}
+          style={{
+            ...btnBase,
+            padding: isMobile ? '6px 10px' : '5px 14px',
+            background: hovered === 'exit-edit' ? 'var(--pixel-btn-hover-bg)' : 'var(--pixel-active-bg)',
+            border: '2px solid var(--pixel-accent)',
+            color: 'var(--pixel-accent)',
+            fontWeight: 'bold',
+          }}
+          title={t.editOfficeLayout}
+          aria-pressed
+        >
+          {isMobile ? '✕' : `✕  ${t.editOfficeLayout}`}
+        </button>
+        {!isBuildingViewOpen && (
+          <FloorSelector
+            floors={floors}
+            currentFloorId={currentFloorId}
+            onSwitchFloor={onSwitchFloor}
+          />
+        )}
+      </div>
+    )
+  }
+
   return (
     <div role="toolbar" aria-label={t.layout} className="pixel-bottom-toolbar" style={panelStyle}>
       {/* 大樓面板：所有人可見 */}
