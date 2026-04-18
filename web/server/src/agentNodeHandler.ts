@@ -1,3 +1,21 @@
+/**
+ * agentNodeHandler — 遠端 Agent Node 的 Socket.IO namespace 管理
+ *
+ * 職責：
+ *   - /agent-node namespace 的 JWT 認證與連線管理
+ *   - 接收 Agent Node 推送的事件（agentStarted、toolStart/Done、transcript…），
+ *     轉換為標準代理事件並廣播至瀏覽器客戶端
+ *   - 為遠端代理的瀏覽器終端提供雙向中繼（browser ↔ server ↔ Agent Node PTY）
+ *   - 心跳監測（timeout 後強制斷線）
+ *   - 斷線寬限期：grace 期內同 sessionId 重連可無縫恢復（不移除代理）
+ *
+ * 關鍵設計：
+ *   - remoteAgentMap：sessionId → agentId 反查表（遠端事件帶 sessionId，需轉為 agentId 才能找到代理）
+ *   - ownedSessions：每個 socket 擁有的 sessionId 集合；斷線時這些代理進入 grace
+ *   - orphanedRemoteAgents：grace 期內保留代理實體但標記 isDetached，重連時可復活
+ *   - 終端中繼是獨立的 Map（remoteTerminalSockets / remoteTerminalNodeSockets）
+ *     用於 browser WebSocket ↔ Agent Node 的雙向 pipe；斷線時立即釋放（不走 grace）
+ */
 import type { Server, Socket } from 'socket.io';
 import type { AgentContext, AgentState } from './types.js';
 import type { AgentNodeEvent, ServerNodeMessage } from 'pixel-agents-shared';
@@ -60,19 +78,24 @@ const orphanedRemoteAgents = new Map<string, { agentId: number; timer: ReturnTyp
 
 /** 設定 Agent Node 的 Socket.IO namespace（/agent-node） */
 export function setupAgentNodeNamespace(io: Server, ctx: AgentContext): void {
+	// 建立（或取得）/agent-node 子 namespace，與瀏覽器用的主 namespace 隔離
 	const ns = io.of('/agent-node');
+	// 儲存參考供外部（終端中繼、排除專案廣播）使用
 	agentNodeNamespace = ns;
 
-	// JWT 認證中介層
+	// JWT 認證中介層：所有連線都要先驗 token，否則拒絕
 	ns.use((socket, next) => {
+		// Agent Node CLI 登入後會把 token 放在 handshake.auth
 		const token = socket.handshake.auth?.token as string | undefined;
 		if (!token) {
 			next(new Error('Authentication required'));
 			return;
 		}
 		try {
+			// 驗簽 + 解析 payload（內含 userId、username）
 			const payload = verifyToken(token);
 			const now = Date.now();
+			// 把使用者資訊與連線狀態附在 socket.data 上供後續 handler 取用
 			(socket as Socket & { data: SocketData }).data = {
 				user: payload,
 				ownedSessions: new Set(),
@@ -82,75 +105,87 @@ export function setupAgentNodeNamespace(io: Server, ctx: AgentContext): void {
 			};
 			next();
 		} catch {
+			// 簽名無效 / 過期 → 拒絕連線
 			next(new Error('Authentication failed'));
 		}
 	});
 
 	ns.on('connection', (rawSocket) => {
+		// 將 raw socket cast 為附帶 SocketData 的型別
 		const socket = rawSocket as Socket & { data: SocketData };
 		const { username } = socket.data.user;
 		console.log(`[Pixel Agents] Agent Node connected: ${username} (${socket.id})`);
 
+		// 向 Agent Node 回報認證成功（含 userId 供其記錄擁有者身分）
 		socket.emit('message', { type: 'authenticated', userId: socket.data.user.userId } satisfies ServerNodeMessage);
 
-		// 連線後立即推送排除專案清單
+		// 連線後立即同步使用者的排除專案清單（Node 不會掃描這些目錄）
 		const excluded = readExcludedProjects();
 		socket.emit('message', { type: 'excludedProjectsSync', excluded } satisfies ServerNodeMessage);
 
+		// 註冊事件處理器：所有 Agent Node 事件都透過 'event' 訊息型別
 		socket.on('event', (event: AgentNodeEvent) => {
 			handleAgentNodeEvent(event, socket, ctx);
 		});
 
 		socket.on('disconnect', () => {
 			console.log(`[Pixel Agents] Agent Node disconnected: ${username} (${socket.id}) — entering ${AGENT_NODE_RECONNECT_GRACE_MS / 1000}s grace`);
-			// 清理此 socket 的所有終端中繼（終端需要立即釋放，不走 grace）
+			// 終端中繼必須立即釋放（使用者無法透過失效 socket 收資料）— 不走 grace
 			cleanupTerminalRelaysForSocket(socket.id);
 
-			// 將此 socket 擁有的代理標記為 orphaned；grace 期內重新連入可恢復
+			// 將此 socket 擁有的代理標記為 orphaned；grace 期內同 sessionId 重連可恢復
 			for (const sessionId of socket.data.ownedSessions) {
 				const agentId = ctx.remoteAgentMap.get(sessionId);
 				if (agentId === undefined) continue;
 				const agent = ctx.agents.get(agentId);
 				if (!agent) continue;
-				// 視覺上標記為 detached（前端可顯示斷線指示）
+				// 前端以橘色光暈/斷線圖示顯示 detached 狀態
 				agent.isDetached = true;
 				ctx.floorSender(agent.floorId).postMessage({ type: 'agentDetached', id: agentId, detached: true });
 
-				// 若已有舊 grace timer（少見：同 sessionId 連續兩次 disconnect），先清掉
+				// 罕見情境：同 sessionId 連續兩次 disconnect（中間沒來得及 reconnect）— 先清舊 timer
 				const prev = orphanedRemoteAgents.get(sessionId);
 				if (prev) clearTimeout(prev.timer);
 
+				// 排程 grace 到期清理：30s 後若仍未重連就真正移除代理
 				const timer = setTimeout(() => {
 					orphanedRemoteAgents.delete(sessionId);
+					// 重新查一次（可能在 grace 期間已被其他路徑清除）
 					const stillAgentId = ctx.remoteAgentMap.get(sessionId);
 					if (stillAgentId === undefined) return;
 					const stillAgent = ctx.agents.get(stillAgentId);
 					if (!stillAgent) return;
 					console.log(`[Pixel Agents] Grace expired, removing orphaned remote agent ${stillAgentId} (session: ${sessionId})`);
 					const floorId = stillAgent.floorId;
+					// 實際移除代理（含 watcher / timer 清理）
 					removeAgent(stillAgentId, ctx);
 					ctx.remoteAgentMap.delete(sessionId);
 					ctx.floorSender(floorId).postMessage({ type: 'agentClosed', id: stillAgentId });
 					ctx.broadcastFloorSummaries();
 				}, AGENT_NODE_RECONNECT_GRACE_MS);
+				// 記錄以便重連時取消
 				orphanedRemoteAgents.set(sessionId, { agentId, timer });
 			}
+			// 清空此 socket 的 session 集合（grace 期間以 orphanedRemoteAgents 為準）
 			socket.data.ownedSessions.clear();
 			ctx.broadcastFloorSummaries();
 		});
 	});
 
-	// 啟動心跳超時檢查（每 TIMEOUT/3 檢查一次）
+	// 心跳超時檢查：每 timeout/3 掃一次，超過 timeout 未收心跳就強制斷線
 	const checkIntervalMs = Math.floor(AGENT_NODE_HEARTBEAT_TIMEOUT_MS / 3);
 	heartbeatCheckInterval = setInterval(() => {
 		const now = Date.now();
+		// 走訪所有連線中的 socket
 		for (const [, rawSocket] of ns.sockets) {
 			const socket = rawSocket as Socket & { data: SocketData };
+			// 超過 timeout 毫秒沒收到心跳 → 視為連線掛掉
 			if (now - socket.data.lastHeartbeat > AGENT_NODE_HEARTBEAT_TIMEOUT_MS) {
 				console.log(
 					`[Pixel Agents] Agent Node heartbeat timeout: ${socket.data.user.username} (${socket.id}), ` +
 					`last heartbeat ${Math.round((now - socket.data.lastHeartbeat) / 1000)}s ago`,
 				);
+				// true = 關閉底層連線（不等 ack）；會觸發上面的 disconnect handler
 				socket.disconnect(true);
 			}
 		}
@@ -425,23 +460,28 @@ function handleAgentNodeEvent(
 
 	switch (event.type) {
 		case 'agentStarted': {
-			// 若有 orphan 記錄（前次斷線尚在 grace 內），取消清除計時器並恢復代理綁定
+			// 分支 A：重連復活路徑 — 先檢查 orphan 表是否有等待中的代理
 			const orphan = orphanedRemoteAgents.get(event.sessionId);
 			if (orphan) {
+				// 取消 grace 清理 timer 避免等等真的被移除
 				clearTimeout(orphan.timer);
 				orphanedRemoteAgents.delete(event.sessionId);
 				const existingAgent = ctx.agents.get(orphan.agentId);
 				if (existingAgent) {
+					// 代理還活著 → 復活（清除斷線標記、更新 owner）
 					existingAgent.isDetached = false;
 					existingAgent.owner = username;
 					existingAgent.ownerId = socket.data.user.userId;
+					// 新 socket 接管此 session
 					socket.data.ownedSessions.add(event.sessionId);
 					console.log(`[Pixel Agents] Remote agent ${orphan.agentId} recovered from grace (session: ${event.sessionId})`);
+					// 回傳既有 agentId 給 Node（Node 會沿用此 ID 繼續推送事件）
 					socket.emit('message', {
 						type: 'agentRegistered',
 						sessionId: event.sessionId,
 						agentId: orphan.agentId,
 					} satisfies ServerNodeMessage);
+					// 通知前端解除斷線顯示
 					ctx.floorSender(existingAgent.floorId).postMessage({
 						type: 'agentDetached',
 						id: orphan.agentId,
@@ -450,19 +490,22 @@ function handleAgentNodeEvent(
 					ctx.broadcastFloorSummaries();
 					return;
 				}
-				// 代理實際已被移除 — 繼續走建立新代理的流程
+				// 保險分支：orphan 表有但代理實體已被清掉 → 走建立新代理流程
 			}
 
-			// 如果此 sessionId 已經有代理，忽略
+			// 分支 B：重複註冊防護（不該發生，但保險）
 			if (ctx.remoteAgentMap.has(event.sessionId)) return;
 
+			// 分支 C：建立新的遠端代理
 			const id = ctx.nextAgentIdRef.current++;
+			// 依專案決定樓層
 			const floorId = resolveFloorForProject(event.projectDir, ctx.building);
+			// 遠端代理的 state：process=null（非本機 spawn）、jsonlFile=''（無檔案監視）、isRemote=true
 			const agent: AgentState = {
 				id,
 				process: null,
 				projectDir: event.projectDir,
-				jsonlFile: '',
+				jsonlFile: '', // 遠端代理沒有本機 JSONL 檔，由 Node 推送事件取代
 				fileOffset: 0,
 				lineBuffer: '',
 				activeToolIds: new Set(),
@@ -490,6 +533,7 @@ function handleAgentNodeEvent(
 				growth: { xp: 0, toolCallCount: 0, sessionCount: 0, bashCallCount: 0, achievements: [] },
 			};
 
+			// 註冊到主 Map + 反查表 + socket 擁有集合
 			ctx.agents.set(id, agent);
 			ctx.remoteAgentMap.set(event.sessionId, id);
 			socket.data.ownedSessions.add(event.sessionId);
@@ -498,6 +542,7 @@ function handleAgentNodeEvent(
 
 			console.log(`[Pixel Agents] Remote agent ${id} started: ${event.projectName} (owner: ${username}, floor: ${floorId})`);
 
+			// 通知同樓層瀏覽器：新增角色（橘色光暈 + @owner 標籤）
 			ctx.floorSender(floorId).postMessage({
 				type: 'agentCreated',
 				id,
@@ -510,6 +555,7 @@ function handleAgentNodeEvent(
 			});
 			ctx.broadcastFloorSummaries();
 
+			// 回報 Node 已註冊成功（Node 可能根據此 agentId 記錄本地映射）
 			socket.emit('message', {
 				type: 'agentRegistered',
 				sessionId: event.sessionId,
@@ -519,25 +565,29 @@ function handleAgentNodeEvent(
 		}
 
 		case 'agentStopped': {
-			// 明確停止 → 取消 grace timer（如有）
+			// 使用者在 Node 端明確結束會話 → 不走 grace，直接移除
+			// 先清掉可能存在的 orphan timer（防止稍後重複觸發）
 			const orphan = orphanedRemoteAgents.get(event.sessionId);
 			if (orphan) {
 				clearTimeout(orphan.timer);
 				orphanedRemoteAgents.delete(event.sessionId);
 			}
+			// 反查 agentId；找不到代表早已清除，無事可做
 			const agentId = ctx.remoteAgentMap.get(event.sessionId);
 			if (agentId === undefined) return;
 			const agent = ctx.agents.get(agentId);
 			if (!agent) return;
 			const floorId = agent.floorId;
 
-			// 清理此代理的終端中繼
+			// 終端中繼立即斷開（相關 WebSocket 會收到 exit code 1）
 			cleanupTerminalRelayForSession(event.sessionId);
 
+			// 實際移除代理 + 清掉反查表 + 從 socket 擁有集合移除
 			removeAgent(agentId, ctx);
 			ctx.remoteAgentMap.delete(event.sessionId);
 			socket.data.ownedSessions.delete(event.sessionId);
 
+			// 通知同樓層瀏覽器移除角色
 			ctx.floorSender(floorId).postMessage({ type: 'agentClosed', id: agentId });
 			ctx.broadcastFloorSummaries();
 			break;
