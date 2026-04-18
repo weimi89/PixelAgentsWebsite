@@ -56,6 +56,21 @@ export const ChatPanel = memo(function ChatPanel({ messages }: ChatPanelProps) {
     if (expanded) setHasNew(false)
   }, [expanded])
 
+  // 展開時：全域 Esc 關閉抽屜（即使未聚焦輸入框也能關閉）
+  // 抽屜右上的 X 按鈕可能被 AuthPanel 的 admin 按鈕蓋住（z-index 差）
+  useEffect(() => {
+    if (!expanded) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // 若焦點在輸入框，讓 input 的 onKeyDown 先處理（blur）
+        if (document.activeElement === inputRef.current) return
+        setExpanded(false)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [expanded])
+
   const handleSend = useCallback(() => {
     const text = inputText.trim()
     if (!text) return
@@ -76,25 +91,20 @@ export const ChatPanel = memo(function ChatPanel({ messages }: ChatPanelProps) {
   const visibleMessages = messages.slice(-CHAT_PANEL_MAX_MESSAGES)
   const lastMsg = visibleMessages.length > 0 ? visibleMessages[visibleMessages.length - 1] : null
 
+  // 右側抽屜寬度（桌面）
+  const DRAWER_WIDTH = 320
   return (
-    <div
-      className="pixel-chat-panel"
-      style={{
-        position: isMobile ? 'fixed' : 'absolute',
-        bottom: isMobile ? 0 : 50,
-        right: isMobile ? 0 : 10,
-        left: isMobile ? 0 : 'auto',
-        zIndex: isMobile ? 44 : 45,
-        display: 'flex',
-        flexDirection: 'column',
-        width: isMobile ? '100%' : 280,
-      }}
-    >
-      {/* 收合時僅顯示最新訊息與切換按鈕 */}
+    <>
+      {/* 收合時的觸發按鈕：右下小方塊顯示最新訊息／新訊息指示燈 */}
       {!expanded && (
         <button
           onClick={() => setExpanded(true)}
           style={{
+            position: isMobile ? 'fixed' : 'absolute',
+            bottom: isMobile ? 90 : 10,
+            right: isMobile ? 8 : 10,
+            left: 'auto',
+            zIndex: isMobile ? 44 : 45,
             background: 'var(--pixel-bg)',
             border: '2px solid var(--pixel-border)',
             borderRadius: 0,
@@ -103,8 +113,8 @@ export const ChatPanel = memo(function ChatPanel({ messages }: ChatPanelProps) {
             display: 'flex',
             alignItems: 'center',
             gap: 6,
+            maxWidth: isMobile ? 'auto' : 280,
             boxShadow: 'var(--pixel-shadow)',
-            ...(isMobile ? { position: 'fixed', bottom: 90, right: 8, left: 'auto', width: 'auto', zIndex: 44 } : {}),
           }}
         >
           <span style={{ fontSize: isMobile ? '16px' : '20px', color: 'var(--pixel-text)' }}>{t.chat}</span>
@@ -138,28 +148,38 @@ export const ChatPanel = memo(function ChatPanel({ messages }: ChatPanelProps) {
         </button>
       )}
 
-      {/* 展開的聊天面板 */}
+      {/* 展開時：右側全高抽屜（桌面）/ 底部抽屜（行動） */}
       {expanded && (
         <div
+          className="pixel-chat-drawer"
           style={{
+            position: 'fixed',
+            // 桌面：右側全高抽屜（避開底部工具列區以免遮蓋其他功能）
+            // 行動：底部抽屜（保留原本 UX）
+            top: isMobile ? 'auto' : 0,
+            bottom: 0,
+            right: 0,
+            left: isMobile ? 0 : 'auto',
+            width: isMobile ? '100%' : DRAWER_WIDTH,
+            // 低於 AgentDetailPanel (310)：兩者同時存在時，詳情面板蓋住聊天（聊天次要）
+            zIndex: 280,
             background: 'var(--pixel-bg)',
             border: isMobile ? 'none' : '2px solid var(--pixel-border)',
-            borderTop: '2px solid var(--pixel-border)',
-            borderRadius: 0,
-            boxShadow: isMobile ? '0 -4px 0 #0a0a14' : 'var(--pixel-shadow)',
+            borderTop: isMobile ? '2px solid var(--pixel-border)' : undefined,
+            boxShadow: isMobile ? '0 -4px 0 #0a0a14' : '-4px 0 0 #0a0a14',
             display: 'flex',
             flexDirection: 'column',
-            maxHeight: isMobile ? '50vh' : 300,
+            maxHeight: isMobile ? '50vh' : 'none',
             paddingBottom: isMobile ? 'env(safe-area-inset-bottom)' : 0,
           }}
         >
-          {/* 標題列 */}
+          {/* 標題列 — 桌面抽屜右側留 90px 讓位給 AuthPanel 的登入/admin 按鈕，避免 X 按鈕被蓋住 */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '4px 8px',
+              padding: isMobile ? '4px 8px' : '4px 96px 4px 8px',
               borderBottom: '1px solid var(--pixel-border)',
             }}
           >
@@ -182,7 +202,7 @@ export const ChatPanel = memo(function ChatPanel({ messages }: ChatPanelProps) {
             </button>
           </div>
 
-          {/* 訊息列表 */}
+          {/* 訊息列表 — 桌面抽屜時填滿可用高度，行動時限制 50vh 內 */}
           <div
             ref={listRef}
             style={{
@@ -190,7 +210,7 @@ export const ChatPanel = memo(function ChatPanel({ messages }: ChatPanelProps) {
               overflowY: 'auto',
               padding: '4px 8px',
               minHeight: 100,
-              maxHeight: 220,
+              maxHeight: isMobile ? 220 : 'none',
             }}
           >
             {visibleMessages.map((msg, i) => {
@@ -277,6 +297,6 @@ export const ChatPanel = memo(function ChatPanel({ messages }: ChatPanelProps) {
           )}
         </div>
       )}
-    </div>
+    </>
   )
 })
