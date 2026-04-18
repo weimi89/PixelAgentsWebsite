@@ -460,81 +460,75 @@ export function removeAgent(
 	agentId: number,
 	ctx: AgentContext,
 ): void {
-	// 從 context 解構出本函式會用到的所有 Map / callback。
-	// 這些都是「全域狀態容器」，由 index.ts 於啟動時初始化後傳入。
+	// 從 context 解構出需要操作的所有 Map 與回呼
 	const {
 		agents, fileWatchers, pollingTimers, waitingTimers,
 		permissionTimers, jsonlPollTimers, persistAgents,
 	} = ctx;
 
-	// 代理可能已被其他路徑移除（例如使用者關閉後又觸發 tmux exit 事件）
-	// — 此處是否真有對應 AgentState 是 idempotent 的判斷，二次呼叫會安全 no-op
+	// 透過 agentId 取出對應的代理物件
 	const agent = agents.get(agentId);
+	// 若代理已不存在（例如被其他路徑重複呼叫過），直接返回不做任何事
 	if (!agent) return;
 
-	// ── (1) 停止 JSONL 檔案等待輪詢 ──
-	// jsonlPollTimers 只在代理剛建立、JSONL 檔尚未出現時存在；
-	// 若代理在 JSONL 還沒出現前就被移除，此計時器可能仍活著。
+	// 取得等待 JSONL 檔案出現的輪詢計時器
 	const jpTimer = jsonlPollTimers.get(agentId);
+	// 若計時器仍在執行，清除它以停止輪詢
 	if (jpTimer) { clearInterval(jpTimer); }
+	// 從 Map 中移除此計時器紀錄
 	jsonlPollTimers.delete(agentId);
 
-	// ── (2) 關閉檔案監聽 ──
-	// fileWatchers 是 fs.watch() 實例；pollingTimers 是 2s 備援輪詢
-	// （因為 fs.watch 在 Windows / macOS 某些情境下不可靠）。
-	// 兩者必須一起清理。
+	// 關閉 fs.watch 檔案監聽實例（?. 是防止 get 回傳 undefined）
 	fileWatchers.get(agentId)?.close();
+	// 從 Map 中移除 watcher 紀錄
 	fileWatchers.delete(agentId);
+	// 取得 2 秒備援輪詢計時器（當 fs.watch 不可靠時的後備）
 	const pt = pollingTimers.get(agentId);
+	// 若存在則清除它
 	if (pt) { clearInterval(pt); }
+	// 從 Map 中移除此輪詢紀錄
 	pollingTimers.delete(agentId);
 
-	// ── (3) 取消 UI 氣泡計時器 ──
-	// 等待氣泡（綠色勾）與權限氣泡（琥珀色點）各自有獨立計時器邏輯，
-	// 見 timerManager.ts；若不取消，代理消失後氣泡還會飄著殘影。
+	// 取消「等待輸入」的綠色勾號氣泡計時器
 	cancelWaitingTimer(agentId, waitingTimers);
+	// 取消「權限請求」的琥珀色圓點氣泡計時器
 	cancelPermissionTimer(agentId, permissionTimers);
 
-	// ── (4) 解除直接子進程的事件監聽 ──
-	// 僅當代理是直接 spawn（非 tmux）時才有 process。
-	// 不先 removeAllListeners 而直接 .kill() 會導致：
-	//   a) 後續 stdout/stderr 片段仍嘗試 log（污染輸出）
-	//   b) exit listener 又呼叫 removeAgent 本身（重入）
-	//   c) EventEmitter MaxListeners 警告（stress test 時最明顯）
+	// 若代理是直接 spawn 啟動（非 tmux 包裹），需要清理子進程事件監聽器，
+	// 避免舊進程仍發出 data/exit 事件造成殭屍 listener 與 MaxListeners 警告
 	if (agent.process) {
+		// 清除標準輸出的所有 data 監聽器
 		agent.process.stdout?.removeAllListeners('data');
+		// 清除標準錯誤的所有 data 監聽器
 		agent.process.stderr?.removeAllListeners('data');
+		// 清除 error 事件所有監聽器
 		agent.process.removeAllListeners('error');
+		// 清除 exit 事件所有監聽器
 		agent.process.removeAllListeners('exit');
+		// 清除 close 事件所有監聽器
 		agent.process.removeAllListeners('close');
 	}
 
-	// ── (5) 從全域索引移除 ──
-	// trackedJsonlFiles 是 `jsonlFile → agentId` 的反查表，由
-	// 自動偵測機制（fileWatcher.ensureProjectScan）用來判斷
-	// 「此檔案是否已被某代理認領」以避免重複收養。
+	// 從「JSONL 路徑 → 代理 ID」反查表中移除，讓自動偵測可重新認領此檔案
 	ctx.trackedJsonlFiles.delete(agent.jsonlFile);
-	// remoteAgentMap 僅對 isRemote=true 的代理有意義，
-	// 供 agentNodeHandler 在收到遠端事件時快速找到對應 agentId。
+	// 若此代理是遠端代理，還需從遠端 sessionId 對應表移除
 	if (agent.remoteSessionId) {
 		ctx.remoteAgentMap.delete(agent.remoteSessionId);
 	}
-	// 樓層代理數 - 1；若降到 0 會觸發 broadcastFloorSummaries 更新 UI 上的計數徽章
+	// 所屬樓層的代理數量 - 1，用於 UI 顯示每層人數徽章
 	ctx.decrementFloorCount(agent.floorId);
 
-	// ── (6) 寫入歷史紀錄 ──
-	// DB 可能為 null（SQLite 初始化失敗 fallback 到 JSON）；
-	// agentKey 用 basename 而非完整路徑，讓同專案不同機器的紀錄可聚合。
+	// 若 SQLite 資料庫可用，寫入一筆 offline 歷史紀錄
 	if (db) {
+		// 用專案目錄名（basename）作為聚合鍵，同專案跨機器的紀錄可一起查詢
 		const agentKey = path.basename(agent.projectDir);
+		// 呼叫 DAO 方法寫入 agent_history 資料表
 		db.addAgentHistory(agentKey, 'offline', `agent_id=${agentId}`);
 	}
 
-	// ── (7) 最後刪除 Map 條目 + 持久化 ──
-	// 順序很重要：前面步驟仍需透過 agent 物件讀屬性；這裡才能真正刪除。
-	// persistAgents 會把當下的 agents Map 序列化寫入
-	// ~/.pixel-agents/persisted-agents.json，下次啟動時恢復外觀。
+	// 從 agents Map 中刪除條目（必須在前面所有操作之後，因為前面還需要讀 agent 屬性）
 	agents.delete(agentId);
+	// 把目前的 agents Map 序列化寫入 ~/.pixel-agents/persisted-agents.json
 	persistAgents();
 }
 
