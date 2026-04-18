@@ -1,4 +1,4 @@
-import { useState, memo } from 'react'
+import { useState, useEffect, useRef, memo } from 'react'
 import { SettingsModal } from './SettingsModal.js'
 import { FloorSelector } from './FloorSelector.js'
 import { useDeviceType } from '../hooks/useDeviceType.js'
@@ -259,7 +259,21 @@ export const BottomToolbar = memo(function BottomToolbar({
   onSeekPlayback,
 }: BottomToolbarProps) {
   const [hovered, setHovered] = useState<string | null>(null)
+  const [showMore, setShowMore] = useState(false)
+  const moreMenuRef = useRef<HTMLDivElement>(null)
   const { isMobile } = useDeviceType()
+
+  // 點擊外部關閉「更多」選單
+  useEffect(() => {
+    if (!showMore) return
+    const handler = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setShowMore(false)
+      }
+    }
+    window.addEventListener('mousedown', handler)
+    return () => window.removeEventListener('mousedown', handler)
+  }, [showMore])
 
   // P5 額外：依角色決定按鈕可見性
   const isAdmin = authRole === 'admin'
@@ -328,22 +342,38 @@ export const BottomToolbar = memo(function BottomToolbar({
     )
   }
 
+  // 包裹選單項執行動作後自動關閉「更多」下拉
+  const runAndCloseMore = (fn: () => void) => () => {
+    fn()
+    setShowMore(false)
+  }
+
+  // 更多選單樣式
+  const moreDropdownStyle: React.CSSProperties = {
+    position: 'absolute',
+    bottom: 'calc(100% + 4px)',
+    left: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+    background: 'var(--pixel-bg)',
+    border: '2px solid var(--pixel-border)',
+    boxShadow: 'var(--pixel-shadow)',
+    padding: '4px',
+    minWidth: 140,
+  }
+
+  // 判斷「更多」選單中是否有任一項處於開啟狀態（用於高亮「更多」按鈕）
+  const anyMoreActive = isDashboardView || isBehaviorEditorOpen || isLayoutShareOpen
+
   return (
     <div role="toolbar" aria-label={t.layout} className="pixel-bottom-toolbar" style={panelStyle}>
       {/* 大樓面板：所有人可見 */}
       {isLoggedIn && tbBtn('building', t.building, t.buildingPanel, <IconBuilding />, onToggleBuildingView, isBuildingViewOpen)}
-      {/* 儀表板：僅登入用戶可見 */}
-      {isLoggedIn && tbBtn('dashboard', isDashboardView ? t.officeView : t.dashboard, t.dashboard, isDashboardView ? <IconOffice /> : <IconDashboard />, onToggleDashboardView, isDashboardView)}
-      {/* 工作階段：僅 admin 可見 */}
-      {isAdmin && tbBtn('sessions', t.sessions, t.browseSessions, <IconSessions />, onOpenSessionPicker, false)}
-      {/* 行為參數：僅 admin 可見 */}
-      {isAdmin && tbBtn('behavior', t.behavior, t.behaviorEditor, <IconBehavior />, onToggleBehaviorEditor, isBehaviorEditorOpen)}
       {/* 空間模板：需登入 */}
       {isLoggedIn && tbBtn('templates', t.layoutTemplates, t.layoutTemplates, <IconTemplates />, onToggleTemplates, isTemplatesOpen)}
       {/* 團隊：需登入 */}
       {isLoggedIn && tbBtn('teams', t.teams, t.allTeams, <IconTeams />, onToggleTeamPanel, isTeamPanelOpen)}
-      {/* 分享佈局：需登入 */}
-      {isLoggedIn && tbBtn('share', t.shareLayout, t.shareLayout, <IconShare />, onToggleLayoutShare, isLayoutShareOpen)}
       {/* 佈局編輯：admin 總是可見，member 僅在自己樓層可見 */}
       {canEditLayout && tbBtn('edit', t.layout, t.editOfficeLayout, <IconEdit />, onToggleEditMode, isEditMode)}
       {/* 設定：僅登入用戶可見 */}
@@ -366,6 +396,40 @@ export const BottomToolbar = memo(function BottomToolbar({
           onThemeToggle={onThemeToggle}
         />
       </div>}
+
+      {/* 「更多」選單：收進次要功能（儀表板、工作、行為、分享佈局） */}
+      {isLoggedIn && (
+        <div style={{ position: 'relative' }} ref={moreMenuRef}>
+          <button
+            onClick={() => setShowMore(v => !v)}
+            onMouseEnter={() => setHovered('more')}
+            onMouseLeave={() => setHovered(null)}
+            aria-expanded={showMore}
+            aria-haspopup="menu"
+            style={
+              anyMoreActive || showMore
+                ? { ...btnActive, padding: isMobile ? '6px' : btnActive.padding }
+                : {
+                    ...btnBase,
+                    padding: isMobile ? '6px' : btnBase.padding,
+                    background: hovered === 'more' ? 'var(--pixel-btn-hover-bg)' : btnBase.background,
+                  }
+            }
+            title="更多"
+          >
+            {isMobile ? '⋯' : '⋯ 更多'}
+          </button>
+          {showMore && (
+            <div role="menu" style={moreDropdownStyle}>
+              {tbBtn('dashboard', isDashboardView ? t.officeView : t.dashboard, t.dashboard, isDashboardView ? <IconOffice /> : <IconDashboard />, runAndCloseMore(onToggleDashboardView), isDashboardView)}
+              {isAdmin && tbBtn('sessions', t.sessions, t.browseSessions, <IconSessions />, runAndCloseMore(onOpenSessionPicker), false)}
+              {isAdmin && tbBtn('behavior', t.behavior, t.behaviorEditor, <IconBehavior />, runAndCloseMore(onToggleBehaviorEditor), isBehaviorEditorOpen)}
+              {tbBtn('share', t.shareLayout, t.shareLayout, <IconShare />, runAndCloseMore(onToggleLayoutShare), isLayoutShareOpen)}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 錄製/回放控制：僅登入用戶可見 */}
       {isLoggedIn && (
       <div style={{ borderLeft: '1px solid var(--pixel-border)', paddingLeft: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
