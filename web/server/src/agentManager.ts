@@ -411,11 +411,28 @@ export function resumeSession(
 	cwd: string,
 	ctx: AgentContext,
 ): void {
+	// JSONL 檔案路徑慣例：`~/.claude/projects/<專案雜湊>/<sessionId>.jsonl`
+	// 這裡「預期」這個檔案會在 spawn 後很快出現，fileWatcher 會等它。
 	const expectedFile = path.join(sessionProjectDir, `${sessionId}.jsonl`);
+
+	// CLI 類型從 projectDir 路徑推導（`.claude/projects` vs `.codex/sessions`
+	// vs `.gemini/tmp/...`），而非從 session 本身檔名。見 detectCliTypeFromPath。
 	const cliType = detectCliTypeFromPath(sessionProjectDir);
+
+	// 每種 CLI 的 resume 旗標不同：
+	//   Claude:  `claude --resume <id>`
+	//   Codex:   `codex resume <id>` 或 `codex --session <id>`（依 adapter）
+	//   Gemini:  目前沒有 resume，adapter 可能回空陣列或使用預設
+	// Adapter 在 cliAdapters/*.ts 實作；若未知 CLI 退回 Claude 風格作為最安全預設。
 	const adapter = getAdapter(cliType);
 	const args = adapter ? adapter.buildResumeArgs(sessionId) : ['--resume', sessionId];
 
+	// 把參數組裝完後，交由共用的 spawnCliAgent 處理：
+	//   - 決定走 tmux 還是直接 spawn
+	//   - 建立 AgentState 並加入 ctx.agents
+	//   - 等 JSONL 檔出現後觸發 fileWatcher
+	//   - 廣播 agentCreated 給同樓層客戶端
+	// label 字串只用於 log，可辨識是 resume vs 全新啟動。
 	spawnCliAgent(
 		args, cwd, expectedFile,
 		`resumed session ${sessionId}`,
@@ -443,28 +460,47 @@ export function removeAgent(
 	agentId: number,
 	ctx: AgentContext,
 ): void {
+	// 從 context 解構出本函式會用到的所有 Map / callback。
+	// 這些都是「全域狀態容器」，由 index.ts 於啟動時初始化後傳入。
 	const {
 		agents, fileWatchers, pollingTimers, waitingTimers,
 		permissionTimers, jsonlPollTimers, persistAgents,
 	} = ctx;
 
+	// 代理可能已被其他路徑移除（例如使用者關閉後又觸發 tmux exit 事件）
+	// — 此處是否真有對應 AgentState 是 idempotent 的判斷，二次呼叫會安全 no-op
 	const agent = agents.get(agentId);
 	if (!agent) return;
 
+	// ── (1) 停止 JSONL 檔案等待輪詢 ──
+	// jsonlPollTimers 只在代理剛建立、JSONL 檔尚未出現時存在；
+	// 若代理在 JSONL 還沒出現前就被移除，此計時器可能仍活著。
 	const jpTimer = jsonlPollTimers.get(agentId);
 	if (jpTimer) { clearInterval(jpTimer); }
 	jsonlPollTimers.delete(agentId);
 
+	// ── (2) 關閉檔案監聽 ──
+	// fileWatchers 是 fs.watch() 實例；pollingTimers 是 2s 備援輪詢
+	// （因為 fs.watch 在 Windows / macOS 某些情境下不可靠）。
+	// 兩者必須一起清理。
 	fileWatchers.get(agentId)?.close();
 	fileWatchers.delete(agentId);
 	const pt = pollingTimers.get(agentId);
 	if (pt) { clearInterval(pt); }
 	pollingTimers.delete(agentId);
 
+	// ── (3) 取消 UI 氣泡計時器 ──
+	// 等待氣泡（綠色勾）與權限氣泡（琥珀色點）各自有獨立計時器邏輯，
+	// 見 timerManager.ts；若不取消，代理消失後氣泡還會飄著殘影。
 	cancelWaitingTimer(agentId, waitingTimers);
 	cancelPermissionTimer(agentId, permissionTimers);
 
-	// 清理直接子進程的事件監聽，避免舊 proc 在移除代理後仍 emit 導致殭屍 listener 或 MaxListeners 警告
+	// ── (4) 解除直接子進程的事件監聽 ──
+	// 僅當代理是直接 spawn（非 tmux）時才有 process。
+	// 不先 removeAllListeners 而直接 .kill() 會導致：
+	//   a) 後續 stdout/stderr 片段仍嘗試 log（污染輸出）
+	//   b) exit listener 又呼叫 removeAgent 本身（重入）
+	//   c) EventEmitter MaxListeners 警告（stress test 時最明顯）
 	if (agent.process) {
 		agent.process.stdout?.removeAllListeners('data');
 		agent.process.stderr?.removeAllListeners('data');
@@ -473,16 +509,31 @@ export function removeAgent(
 		agent.process.removeAllListeners('close');
 	}
 
+	// ── (5) 從全域索引移除 ──
+	// trackedJsonlFiles 是 `jsonlFile → agentId` 的反查表，由
+	// 自動偵測機制（fileWatcher.ensureProjectScan）用來判斷
+	// 「此檔案是否已被某代理認領」以避免重複收養。
 	ctx.trackedJsonlFiles.delete(agent.jsonlFile);
+	// remoteAgentMap 僅對 isRemote=true 的代理有意義，
+	// 供 agentNodeHandler 在收到遠端事件時快速找到對應 agentId。
 	if (agent.remoteSessionId) {
 		ctx.remoteAgentMap.delete(agent.remoteSessionId);
 	}
+	// 樓層代理數 - 1；若降到 0 會觸發 broadcastFloorSummaries 更新 UI 上的計數徽章
 	ctx.decrementFloorCount(agent.floorId);
-	// 記錄代理離線歷史
+
+	// ── (6) 寫入歷史紀錄 ──
+	// DB 可能為 null（SQLite 初始化失敗 fallback 到 JSON）；
+	// agentKey 用 basename 而非完整路徑，讓同專案不同機器的紀錄可聚合。
 	if (db) {
 		const agentKey = path.basename(agent.projectDir);
 		db.addAgentHistory(agentKey, 'offline', `agent_id=${agentId}`);
 	}
+
+	// ── (7) 最後刪除 Map 條目 + 持久化 ──
+	// 順序很重要：前面步驟仍需透過 agent 物件讀屬性；這裡才能真正刪除。
+	// persistAgents 會把當下的 agents Map 序列化寫入
+	// ~/.pixel-agents/persisted-agents.json，下次啟動時恢復外觀。
 	agents.delete(agentId);
 	persistAgents();
 }
