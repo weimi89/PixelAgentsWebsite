@@ -5,6 +5,10 @@
 ## [Unreleased]
 
 ### 新增
+- **README 國際化**
+  - `README.md` 改為英文主版（Operation Spotlight 前置：面向 GitHub 英文社群）
+  - `README.zh-TW.md` 保留完整繁體中文版本（互相於檔頭交叉連結）
+  - 英文版加強「Why」章節以吸引國際訪客
 - **與 PixelAgentsDesktop 的 shared/ 同步機制**
   - `scripts/check-desktop-sync.mjs`：比對兩 repo 的 `shared/` 是否 drift
   - `scripts/sync-to-desktop.mjs`：把本 repo 權威版本推送至 Desktop
