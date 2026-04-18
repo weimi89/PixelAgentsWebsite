@@ -1,0 +1,92 @@
+name: 🐛 Bug report
+description: 回報功能異常或非預期行為
+title: "[bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感謝回報！請先用搜尋確認問題未被回報過。**嚴重安全漏洞請走 [SECURITY.md](../blob/main/SECURITY.md) 的私下管道**。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 發生了什麼事？
+      description: 用一段話描述問題
+      placeholder: 點擊代理後畫面沒反應…
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: 重現步驟
+      placeholder: |
+        1. 啟動伺服器 `npm start`
+        2. 瀏覽器開啟 http://localhost:13001
+        3. 點擊代理 A
+        4. 觀察…
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 預期行為
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 實際行為
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Commit / 版本
+      placeholder: "例如 main @ 7d673e9 或 v1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: cli
+    attributes:
+      label: CLI 類型
+      options:
+        - Claude Code
+        - Codex
+        - Gemini
+        - 多種混用
+        - 不確定
+    validations:
+      required: false
+
+  - type: textarea
+    id: env
+    attributes:
+      label: 環境資訊
+      placeholder: |
+        OS: macOS 14.5
+        Node: 20.11
+        瀏覽器: Chrome 126
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 伺服器 / 瀏覽器 console 日誌（若有）
+      render: shell
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: 確認
+      options:
+        - label: 我已搜尋過沒有重複的 issue
+          required: true
+        - label: 我確認此非安全漏洞（安全漏洞另走私下管道）
+          required: true

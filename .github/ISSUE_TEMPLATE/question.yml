@@ -1,0 +1,19 @@
+name: ❓ Question
+description: 使用疑問或文件不清楚的地方
+title: "[question] "
+labels: ["question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: 你的問題
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: 你已經查過哪些資料？
+      placeholder: 我讀了 README 與 CLAUDE.md，但不確定…
+    validations:
+      required: true

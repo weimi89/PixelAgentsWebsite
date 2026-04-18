@@ -43,6 +43,32 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Bundle size 追蹤：記錄每次 build 後的 client chunk 大小
+      # 後續可擴充為 PR 自動評論大小差異
+      - name: Report bundle sizes
+        if: always()
+        run: |
+          echo "## 📦 Bundle sizes (gzipped estimate via stat)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| File | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          cd client/dist/assets
+          for f in *.js; do
+            size=$(stat -f%z "$f" 2>/dev/null || stat -c%s "$f")
+            size_kb=$(echo "scale=1; $size / 1024" | bc)
+            gz_size=$(gzip -c "$f" | wc -c)
+            gz_kb=$(echo "scale=1; $gz_size / 1024" | bc)
+            echo "| \`$f\` | ${size_kb} KB (gzip: ${gz_kb} KB) |" >> $GITHUB_STEP_SUMMARY
+          done
+
+      - name: Upload build artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-dist-${{ github.sha }}
+          path: web/client/dist/
+          retention-days: 7
+
   audit:
     name: npm audit
     runs-on: ubuntu-latest

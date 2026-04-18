@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 安全漏洞回報
+    url: https://github.com/weimi89/PixelAgentsWebsite/blob/main/SECURITY.md
+    about: 嚴重漏洞請走私下管道，不要開 public issue
+  - name: 💬 一般討論（GitHub Discussions）
+    url: https://github.com/weimi89/PixelAgentsWebsite/discussions
+    about: 閒聊、展示你的佈局、分享使用心得

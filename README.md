@@ -1,5 +1,11 @@
 # OnlinePixelAgents
 
+[![CI](https://github.com/weimi89/PixelAgentsWebsite/actions/workflows/ci.yml/badge.svg)](https://github.com/weimi89/PixelAgentsWebsite/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg)](tsconfig.json)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](#需求)
+[![Tests](https://img.shields.io/badge/tests-139_passing-brightgreen.svg)](#測試)
+
 像素藝術辦公室，讓你的 AI 程式代理在瀏覽器中變成動畫角色。
 
 基於 [pablodelucca/pixel-agents](https://github.com/pablodelucca/pixel-agents)（VS Code 擴充套件）改造為獨立 Web 應用，透過 Express + Socket.IO 伺服器自動偵測本機執行中的 Claude Code 會話，無需 VS Code。
@@ -257,6 +263,34 @@ npm run import-tileset
 - `users.json` / `jwt-secret.key` — 認證（有 SQLite 後優先存 DB）
 - `audit.jsonl` — 稽核日誌（備援）
 - `backups/` — 自動備份
+
+## 貢獻與成長
+
+這個專案希望**持續演進**。無論是修 typo、補測試、提新想法都歡迎：
+
+- 📜 [`ROADMAP.md`](ROADMAP.md) — 短 / 中 / 長期方向與明確劃界
+- 🛠 [`CONTRIBUTING.md`](CONTRIBUTING.md) — 開發環境、風格、PR 流程
+- 🔒 [`SECURITY.md`](SECURITY.md) — 漏洞回報與現行安全機制
+- 📝 [`CHANGELOG.md`](CHANGELOG.md) — 所有累積變更
+
+**快速貢獻**：
+
+```bash
+# 1. Fork + clone
+cd web && npm install   # 自動設定 pre-commit hook（typecheck + test）
+# 2. 建立 feature branch 並寫改動
+# 3. 送 PR — CI 會跑 typecheck / lint / test / build / bundle size / audit
+```
+
+### 成長指標（最新）
+
+| 指標 | 目前 |
+|---|---|
+| 測試數 | 139 passing |
+| Lint errors | 0 |
+| npm audit（moderate+） | 0 vulnerabilities |
+| Bundle 首載 (gzip) | 154 KB |
+| TypeScript | strict |
 
 ## 致謝
 

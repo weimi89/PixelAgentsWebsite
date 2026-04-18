@@ -1,0 +1,35 @@
+version: 2
+updates:
+  # web monorepo 的依賴（workspaces 包含 shared/server/client/agent-node）
+  - package-ecosystem: npm
+    directory: "/web"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    # 合併所有 devDependencies 升級為單一 PR，減少噪音
+    groups:
+      dev-deps:
+        dependency-type: development
+      prod-deps-minor-patch:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+    # Prod dependency 的 major 升級仍分開，便於人工審查
+    labels:
+      - dependencies
+    commit-message:
+      prefix: deps
+      include: scope
+
+  # GitHub Actions workflow 本身的 action 版本
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    labels:
+      - ci
+      - dependencies
+    commit-message:
+      prefix: ci
