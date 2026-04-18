@@ -64,6 +64,7 @@ import { codexAdapter } from './cliAdapters/codexAdapter.js';
 import { geminiAdapter } from './cliAdapters/geminiAdapter.js';
 import { startStressTest, stopStressTest } from './stressTest.js';
 import { createRateLimit } from './rateLimit.js';
+import { registerMonitoringRoutes } from './monitoringRoutes.js';
 import { sanitizeSessionId, sanitizeProjectDir } from './pathSecurity.js';
 import { logAudit } from './auditLog.js';
 import { logger } from './logger.js';
@@ -451,89 +452,9 @@ async function main(): Promise<void> {
 	app.use('/api/auth/register', registerRateLimit);
 	app.use('/api/auth', apiRateLimit, authRouter);
 
-	// ── 健康檢查端點（Docker HEALTHCHECK / 負載均衡器）────────
-	// /health：liveness — 進程存活即回 200
-	app.get('/health', (_req, res) => {
-		res.json({ status: 'ok', uptime: Math.round(process.uptime()) });
-	});
-	// /ready：readiness — 檢查資料庫/關鍵資源可用，否則回 503
-	app.get('/ready', (_req, res) => {
-		try {
-			// 若設定了 Redis，也要求其可連線
-			if (config.redisUrl && !redis.isConnected()) {
-				res.status(503).json({ ready: false, reason: 'redis_disconnected' });
-				return;
-			}
-			res.json({ ready: true, uptime: Math.round(process.uptime()) });
-		} catch (err) {
-			res.status(503).json({ ready: false, reason: err instanceof Error ? err.message : 'unknown' });
-		}
-	});
-
-	// 指標端點（JSON 格式，壓力測試與監控用；保留向下相容）
-	app.get('/api/metrics', (_req, res) => {
-		const mem = process.memoryUsage();
-		res.json({
-			agents: ctx.agents.size,
-			remoteAgents: ctx.remoteAgentMap.size,
-			trackedFiles: ctx.trackedJsonlFiles.size,
-			heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
-			rssMB: Math.round(mem.rss / 1024 / 1024),
-			uptimeSeconds: Math.round(process.uptime()),
-		});
-	});
-
-	// Prometheus 指標端點（OpenMetrics text format）
-	// 使用 `scrape_configs` 設定為 `metrics_path: /metrics` 即可直接接 Prometheus
-	app.get('/metrics', (_req, res) => {
-		const mem = process.memoryUsage();
-		const uptime = process.uptime();
-		const lines: string[] = [
-			'# HELP pixel_agents_active_total Currently active agents (local + remote)',
-			'# TYPE pixel_agents_active_total gauge',
-			`pixel_agents_active_total ${ctx.agents.size}`,
-			'# HELP pixel_agents_remote_total Currently active remote agents (via Agent Node)',
-			'# TYPE pixel_agents_remote_total gauge',
-			`pixel_agents_remote_total ${ctx.remoteAgentMap.size}`,
-			'# HELP pixel_agents_tracked_files_total JSONL files currently being watched',
-			'# TYPE pixel_agents_tracked_files_total gauge',
-			`pixel_agents_tracked_files_total ${ctx.trackedJsonlFiles.size}`,
-			'# HELP pixel_agents_floors_total Configured building floors',
-			'# TYPE pixel_agents_floors_total gauge',
-			`pixel_agents_floors_total ${ctx.building.floors.length}`,
-			'# HELP process_resident_memory_bytes Resident set size in bytes',
-			'# TYPE process_resident_memory_bytes gauge',
-			`process_resident_memory_bytes ${mem.rss}`,
-			'# HELP process_heap_used_bytes Heap memory used in bytes',
-			'# TYPE process_heap_used_bytes gauge',
-			`process_heap_used_bytes ${mem.heapUsed}`,
-			'# HELP process_heap_total_bytes Heap memory allocated in bytes',
-			'# TYPE process_heap_total_bytes gauge',
-			`process_heap_total_bytes ${mem.heapTotal}`,
-			'# HELP process_uptime_seconds Process uptime in seconds',
-			'# TYPE process_uptime_seconds gauge',
-			`process_uptime_seconds ${uptime.toFixed(3)}`,
-		];
-		res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
-		res.send(lines.join('\n') + '\n');
-	});
-
-	// 詳細狀態端點（含版本、樓層、記憶體等）
-	app.get('/api/status', (_req, res) => {
-		const mem = process.memoryUsage();
-		res.json({
-			status: 'ok',
-			version: '1.0.0',
-			agents: { total: ctx.agents.size, remote: ctx.remoteAgentMap.size },
-			memory: {
-				heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
-				rssMB: Math.round(mem.rss / 1024 / 1024),
-			},
-			uptime: Math.round(process.uptime()),
-			floors: ctx.building.floors.length,
-			trackedFiles: ctx.trackedJsonlFiles.size,
-		});
-	});
+	// ── 健康檢查 + 指標路由（/health、/ready、/metrics、/api/metrics、/api/status）────
+	// 詳細實作見 monitoringRoutes.ts；ctx 以 closure 方式捕獲，狀態即時反映
+	registerMonitoringRoutes(app, ctx);
 
 	// 叢集狀態端點（Task 7.2: 伺服器聯邦）
 	app.get('/api/cluster/status', (_req, res) => {
