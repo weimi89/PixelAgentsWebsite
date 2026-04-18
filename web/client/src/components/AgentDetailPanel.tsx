@@ -52,7 +52,9 @@ const panelStyle: React.CSSProperties = {
   top: 0,
   bottom: 0,
   width: PANEL_WIDTH,
-  zIndex: 50,
+  // 面板為當前焦點，必須高於 AuthPanel（登入/admin 按鈕 z-index = 300）
+  // 否則右上角的登入按鈕會蓋住面板標題列的關閉 X 按鈕
+  zIndex: 310,
   background: 'var(--pixel-bg)',
   borderLeft: '2px solid var(--pixel-border)',
   boxShadow: '-4px 0 0 #0a0a14',
@@ -368,7 +370,8 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
     borderRight: 'none',
     borderTop: '2px solid var(--pixel-border)',
     boxShadow: '0 -4px 0 #0a0a14',
-    zIndex: 60,
+    // 同 desktop：高於 AuthPanel (300) 避免登入按鈕遮蓋關閉 X
+    zIndex: 310,
     borderRadius: 0,
     paddingBottom: 'env(safe-area-inset-bottom)',
   } : {}
@@ -389,7 +392,8 @@ export const AgentDetailPanel = memo(function AgentDetailPanel({
             position: 'fixed',
             inset: 0,
             background: visible ? 'rgba(0,0,0,0.5)' : 'transparent',
-            zIndex: 59,
+            // 與 panel 同步提升（309 剛好低於 panel 310 一層，維持遮罩在面板後）
+            zIndex: 309,
             transition: 'background 0.2s ease-out',
             pointerEvents: visible ? 'auto' : 'none',
           }}
