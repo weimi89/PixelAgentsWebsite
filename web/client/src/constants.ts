@@ -11,6 +11,12 @@ export const MAX_ROWS = 64
 export const WALK_SPEED_PX_PER_SEC = 48
 export const WALK_FRAME_DURATION_SEC = 0.15
 export const TYPE_FRAME_DURATION_SEC = 0.3
+/** 步行每走多少像素切換一幀 — 使動畫與實際位移同步，走快/慢都自然 */
+export const WALK_STEP_DISTANCE_PX = 8
+/** 步行時身體上下彈跳幅度（抬腳幀 y 偏移） */
+export const WALK_BOB_PIXELS = 1
+/** 方向改變時的停頓秒數 — 模擬人類轉身，消除瞬間轉向的機械感 */
+export const WALK_TURN_PAUSE_SEC = 0.08
 export const WANDER_PAUSE_MIN_SEC = 3.0
 export const WANDER_PAUSE_MAX_SEC = 12.0
 export const WANDER_MOVES_BEFORE_REST_MIN = 2

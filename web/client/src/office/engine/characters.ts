@@ -4,7 +4,8 @@ import type { CharacterSprites } from '../sprites/spriteData.js'
 import { findPath } from '../layout/tileMap.js'
 import {
   WALK_SPEED_PX_PER_SEC,
-  WALK_FRAME_DURATION_SEC,
+  WALK_STEP_DISTANCE_PX,
+  WALK_TURN_PAUSE_SEC,
   TYPE_FRAME_DURATION_SEC,
   WANDER_MOVES_BEFORE_REST_MIN,
   WANDER_MOVES_BEFORE_REST_MAX,
@@ -35,6 +36,52 @@ const READING_TOOLS = new Set(['Read', 'Grep', 'Glob', 'WebFetch', 'WebSearch'])
 export function isReadingTool(tool: string | null): boolean {
   if (!tool) return false
   return READING_TOOLS.has(tool)
+}
+
+/**
+ * 推進角色於一格之間的移動。
+ * 回傳 true 表示本 tick 已消耗（步行動畫已處理），呼叫者可直接跳過後續邏輯。
+ *
+ * 改進項目（使走路更自然）：
+ *   - 方向改變時有短暫 turnPauseTimer 停頓，消除瞬間轉向的機械感
+ *   - 動畫幀切換依「實際像素距離」而非固定時間，走快/慢都一致
+ */
+function advanceWalk(ch: Character, next: { col: number; row: number }, dt: number): void {
+  const newDir = directionBetween(ch.tileCol, ch.tileRow, next.col, next.row)
+  // 轉向停頓：新方向與目前不同 → 先停頓一瞬間再續走
+  if (newDir !== ch.dir) {
+    ch.dir = newDir
+    ch.turnPauseTimer = WALK_TURN_PAUSE_SEC
+  }
+  if (ch.turnPauseTimer && ch.turnPauseTimer > 0) {
+    ch.turnPauseTimer -= dt
+    return
+  }
+
+  const deltaPx = WALK_SPEED_PX_PER_SEC * dt
+  ch.moveProgress += deltaPx / TILE_SIZE
+  // 幀時序改為像素距離累加（每走 WALK_STEP_DISTANCE_PX 切一幀），
+  // 使走路動畫與實際位移視覺上同步
+  ch.frameTimer += deltaPx
+  if (ch.frameTimer >= WALK_STEP_DISTANCE_PX) {
+    ch.frameTimer -= WALK_STEP_DISTANCE_PX
+    ch.frame = (ch.frame + 1) % 4
+  }
+
+  const fromCenter = tileCenter(ch.tileCol, ch.tileRow)
+  const toCenter = tileCenter(next.col, next.row)
+  const t = Math.min(ch.moveProgress, 1)
+  ch.x = fromCenter.x + (toCenter.x - fromCenter.x) * t
+  ch.y = fromCenter.y + (toCenter.y - fromCenter.y) * t
+
+  if (ch.moveProgress >= 1) {
+    ch.tileCol = next.col
+    ch.tileRow = next.row
+    ch.x = toCenter.x
+    ch.y = toCenter.y
+    ch.path.shift()
+    ch.moveProgress = 0
+  }
 }
 
 /** 判斷狀態是否需要坐姿偏移（在椅子上的狀態） */
@@ -620,12 +667,6 @@ export function updateCharacter(
     }
 
     case CharacterState.WALK: {
-      // 步行動畫
-      if (ch.frameTimer >= WALK_FRAME_DURATION_SEC) {
-        ch.frameTimer -= WALK_FRAME_DURATION_SEC
-        ch.frame = (ch.frame + 1) % 4
-      }
-
       if (ch.path.length === 0) {
         // 路徑完成 — 對齊至格中心並轉換狀態
         const center = tileCenter(ch.tileCol, ch.tileRow)
@@ -747,26 +788,8 @@ export function updateCharacter(
         break
       }
 
-      // 朝路徑中的下一格移動
-      const nextTile = ch.path[0]
-      ch.dir = directionBetween(ch.tileCol, ch.tileRow, nextTile.col, nextTile.row)
-
-      ch.moveProgress += (WALK_SPEED_PX_PER_SEC / TILE_SIZE) * dt
-
-      const fromCenter = tileCenter(ch.tileCol, ch.tileRow)
-      const toCenter = tileCenter(nextTile.col, nextTile.row)
-      const t = Math.min(ch.moveProgress, 1)
-      ch.x = fromCenter.x + (toCenter.x - fromCenter.x) * t
-      ch.y = fromCenter.y + (toCenter.y - fromCenter.y) * t
-
-      if (ch.moveProgress >= 1) {
-        ch.tileCol = nextTile.col
-        ch.tileRow = nextTile.row
-        ch.x = toCenter.x
-        ch.y = toCenter.y
-        ch.path.shift()
-        ch.moveProgress = 0
-      }
+      // 朝路徑中的下一格移動（自然化：距離同步幀 + 轉向停頓）
+      advanceWalk(ch, ch.path[0], dt)
 
       // 若在漫遊期間變為活躍，重新尋路至座位
       if (ch.isActive && ch.seatId) {
@@ -887,11 +910,7 @@ export function updateCharacter(
       if (!ch.emoteType) {
         setEmote(ch, EmoteType.IDEA, EMOTE_DISPLAY_DURATION_SEC)
       }
-      // 思考踱步
-      if (ch.frameTimer >= WALK_FRAME_DURATION_SEC) {
-        ch.frameTimer -= WALK_FRAME_DURATION_SEC
-        ch.frame = (ch.frame + 1) % 4
-      }
+      // 步行動畫由 advanceWalk 推進
 
       // 不再思考 → 返回工作
       if (!ch.isThinking) {
@@ -931,23 +950,7 @@ export function updateCharacter(
       }
 
       if (ch.path.length > 0) {
-        const nextStep = ch.path[0]
-        ch.dir = directionBetween(ch.tileCol, ch.tileRow, nextStep.col, nextStep.row)
-        ch.moveProgress += (WALK_SPEED_PX_PER_SEC / TILE_SIZE) * dt
-        const from = tileCenter(ch.tileCol, ch.tileRow)
-        const to = tileCenter(nextStep.col, nextStep.row)
-        const p = Math.min(ch.moveProgress, 1)
-        ch.x = from.x + (to.x - from.x) * p
-        ch.y = from.y + (to.y - from.y) * p
-
-        if (ch.moveProgress >= 1) {
-          ch.tileCol = nextStep.col
-          ch.tileRow = nextStep.row
-          ch.x = to.x
-          ch.y = to.y
-          ch.path.shift()
-          ch.moveProgress = 0
-        }
+        advanceWalk(ch, ch.path[0], dt)
       }
       break
     }
@@ -1001,11 +1004,6 @@ export function updateCharacter(
     }
 
     case CharacterState.ENTER_ELEVATOR: {
-      // 走向電梯的步行動畫
-      if (ch.frameTimer >= WALK_FRAME_DURATION_SEC) {
-        ch.frameTimer -= WALK_FRAME_DURATION_SEC
-        ch.frame = (ch.frame + 1) % 4
-      }
       if (ch.path.length === 0) {
         // 到達電梯位置 → 觸發消散（由 officeState 的 matrix 特效處理）
         ch.transferTargetFloor = 'despawning'
@@ -1016,23 +1014,7 @@ export function updateCharacter(
         ch.bubbleType = null
         break
       }
-      // 朝路徑中的下一格移動
-      const elevNext = ch.path[0]
-      ch.dir = directionBetween(ch.tileCol, ch.tileRow, elevNext.col, elevNext.row)
-      ch.moveProgress += (WALK_SPEED_PX_PER_SEC / TILE_SIZE) * dt
-      const elevFrom = tileCenter(ch.tileCol, ch.tileRow)
-      const elevTo = tileCenter(elevNext.col, elevNext.row)
-      const elevP = Math.min(ch.moveProgress, 1)
-      ch.x = elevFrom.x + (elevTo.x - elevFrom.x) * elevP
-      ch.y = elevFrom.y + (elevTo.y - elevFrom.y) * elevP
-      if (ch.moveProgress >= 1) {
-        ch.tileCol = elevNext.col
-        ch.tileRow = elevNext.row
-        ch.x = elevTo.x
-        ch.y = elevTo.y
-        ch.path.shift()
-        ch.moveProgress = 0
-      }
+      advanceWalk(ch, ch.path[0], dt)
       break
     }
   }

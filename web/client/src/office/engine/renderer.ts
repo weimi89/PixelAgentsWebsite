@@ -1,4 +1,4 @@
-import { TileType, TILE_SIZE } from '../types.js'
+import { TileType, TILE_SIZE, CharacterState } from '../types.js'
 import type { TileType as TileTypeVal, FurnitureInstance, Character, SpriteData, Seat, FloorColor } from '../types.js'
 import { getCachedSprite, getOutlineSprite, tintCanvas } from '../sprites/spriteCache.js'
 import { getCharacterSprites, BUBBLE_PERMISSION_SPRITE, BUBBLE_WAITING_SPRITE, BUBBLE_DETACHED_SPRITE, getEmoteSprite } from '../sprites/spriteData.js'
@@ -18,6 +18,7 @@ import {
   MINIMAP_WALL_COLOR,
   MINIMAP_FURNITURE_COLOR,
   CHARACTER_SITTING_OFFSET_PX,
+  WALK_BOB_PIXELS,
   CHARACTER_Z_SORT_OFFSET,
   OUTLINE_Z_SORT_OFFSET,
   SELECTED_OUTLINE_ALPHA,
@@ -191,9 +192,15 @@ export function renderScene(
     const cached = getCachedSprite(spriteData, zoom)
     // 坐姿偏移：角色坐下時向下移動，使其視覺上坐在椅子上
     const sittingOffset = isSittingState(ch.state) ? CHARACTER_SITTING_OFFSET_PX : 0
+    // 步行彈跳：走路時 frame 0/2（左右腳踩出）身體微抬，frame 1/3（站立）回到基準
+    // 使走路動作有自然的一抬一落感，而非單純的滑動
+    const isMoving = ch.state === CharacterState.WALK
+      || ch.state === CharacterState.THINK
+      || ch.state === CharacterState.ENTER_ELEVATOR
+    const walkBob = (isMoving && (ch.frame === 0 || ch.frame === 2)) ? -WALK_BOB_PIXELS : 0
     // 錨點在角色底部中央 — 四捨五入為整數裝置像素
     const drawX = Math.round(offsetX + ch.x * zoom - cached.width / 2)
-    const drawY = Math.round(offsetY + (ch.y + sittingOffset) * zoom - cached.height)
+    const drawY = Math.round(offsetY + (ch.y + sittingOffset + walkBob) * zoom - cached.height)
 
     // 按角色格底部排序（非中心）使其渲染在
     // 同行家具（如椅子）前方，但在較低行家具

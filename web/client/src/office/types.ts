@@ -227,8 +227,10 @@ export interface Character {
   hueShift: number
   /** 動畫幀索引 */
   frame: number
-  /** 動畫用時間累加器 */
+  /** 動畫用時間累加器（步行時改為像素距離累加，見 characters.ts） */
   frameTimer: number
+  /** 轉向停頓倒數（>0 時暫停移動，模擬轉身） */
+  turnPauseTimer?: number
   /** 閒置漫遊決策計時器 */
   wanderTimer: number
   /** 當前漫遊週期中已完成的漫遊移動次數 */
