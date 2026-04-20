@@ -29,14 +29,14 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.2",
     "@types/jsonwebtoken": "^9.0.9",
-    "@types/node": "^22.15.0",
+    "@types/node": "^25.6.0",
     "@types/pngjs": "^6.0.5",
     "@types/ws": "^8.18.1",
-    "eslint": "^10.0.2",
-    "globals": "^17.3.0",
+    "eslint": "^10.2.1",
+    "globals": "^17.5.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1",
-    "vitest": "^4.0.18"
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.0",
+    "vitest": "^4.1.4"
   }
 }
