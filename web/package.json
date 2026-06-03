@@ -40,7 +40,7 @@
     "prepare": "cd .. && git config core.hooksPath .githooks 2>/dev/null || true"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1",
-    "prettier": "^3.8.1"
+    "concurrently": "^10.0.3",
+    "prettier": "^3.8.3"
   }
 }
