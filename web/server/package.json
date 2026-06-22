@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@socket.io/redis-adapter": "^8.3.0",
-    "bcryptjs": "^2.4.3",
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.8.0",
     "express": "^5.1.0",
     "ioredis": "^5.10.0",
@@ -25,7 +25,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/bcryptjs": "^2.4.6",
+    "@types/bcryptjs": "^3.0.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.2",
     "@types/jsonwebtoken": "^9.0.9",
