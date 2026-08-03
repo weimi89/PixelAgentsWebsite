@@ -21,7 +21,7 @@
     "pixel-agents-shared": "*",
     "pngjs": "^7.0.0",
     "socket.io": "^4.8.1",
-    "ws": "^8.18.3"
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
