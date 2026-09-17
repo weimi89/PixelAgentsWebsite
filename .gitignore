@@ -21,11 +21,15 @@ dist
 # Project-specific
 /sprites-export
 # Backups
-backups/
 
 # Dev notes
-docs/dev-notes/
 
 # Tools
-.claude/
-.serena/
+
+# AI 協作文件與規則一律放 ../PixelAgentsBrain，專案內只有符號連結，不入版控、不部署
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+.claude
+.serena
+backups/

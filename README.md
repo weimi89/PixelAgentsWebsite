@@ -171,8 +171,6 @@ web/
   scripts/     — Drift check, sync, demo recording helpers
 ```
 
-See [CLAUDE.md](CLAUDE.md) for full architecture.
-
 ---
 
 ## Environment variables

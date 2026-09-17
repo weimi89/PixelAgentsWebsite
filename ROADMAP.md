@@ -1,6 +1,6 @@
 # ROADMAP
 
-此檔案列出專案的演進方向。詳細架構請見 [`docs/ROADMAP.md`](docs/ROADMAP.md)；歷史變更請見 [`CHANGELOG.md`](CHANGELOG.md)。
+此檔案列出專案的演進方向；歷史變更請見 [`CHANGELOG.md`](CHANGELOG.md)。
 
 > 專案維持「可觀察、可測試、可逐步擴充」三原則。每個里程碑都應：
 > 1. 有可驗證的完成條件
@@ -53,7 +53,7 @@
 - [ ] 代理分群/標籤系統（按專案類型、團隊、客戶自訂分組）
 - [ ] 對話記錄全文搜尋（SQLite FTS5）
 - [ ] 統計儀表板增強（按日/週/月趨勢、Tool 熱度）
-- [ ] WebRTC 語音連線（佈局見 `docs/dev-notes/webrtc-voice-plan.md`）
+- [ ] WebRTC 語音連線
 - [ ] P2P 直連模式（減輕中央伺服器負擔）
 
 ## 📍 長期

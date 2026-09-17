@@ -23,8 +23,6 @@ web/
   agent-node/  — 遠端機器 CLI（將本機 Claude 會話推送至伺服器）
 ```
 
-完整架構請讀 [`CLAUDE.md`](CLAUDE.md) 和 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
-
 ## 💬 貢獻流程
 
 ### 🐛 發現 bug
